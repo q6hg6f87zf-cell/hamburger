@@ -1,0 +1,2340 @@
+import { useState, useEffect, useRef, useCallback, Suspense, useMemo } from “react”;
+import { Canvas, useFrame } from “@react-three/fiber”;
+import { OrbitControls, Stars, Html, Sphere } from “@react-three/drei”;
+import * as THREE from “three”;
+
+/* ═══════════════════════════════════════════════════════════════════
+SUPABASE CONFIG — replace with your project credentials
+Get from: https://supabase.com → Project → Settings → API
+npm install @supabase/supabase-js  then uncomment the imports below
+═══════════════════════════════════════════════════════════════════
+import { createClient } from ‘@supabase/supabase-js’
+const supabase = createClient(‘https://YOUR_PROJECT.supabase.co’, ‘YOUR_ANON_KEY’)
+*/
+
+// ── LOCAL PERSISTENCE (works offline; swap save/load for Supabase calls in prod) ──
+const S = {
+get: (k, d) => { try { const v = localStorage.getItem(“hr2_” + k); return v ? JSON.parse(v) : d; } catch { return d; } },
+set: (k, v) => { try { localStorage.setItem(“hr2_” + k, JSON.stringify(v)); } catch {} },
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+GAME DATA
+═══════════════════════════════════════════════════════════════════ */
+const CLASSES = [“Warrior”,“Wizard”,“Rogue”,“Healer”,“Merchant”,“Bard”];
+const CLASS_HP = {Warrior:12,Wizard:7,Rogue:8,Healer:9,Merchant:8,Bard:8};
+const CLASS_ICON_EMO = {Warrior:“⚔️”,Wizard:“🔮”,Rogue:“🗡️”,Healer:“💚”,Merchant:“💰”,Bard:“🎵”};
+const CLASS_BASE_STATS = {
+Warrior:{STR:8,DEF:7,INT:3,WIS:4,SPD:4,CHA:3,LCK:3},
+Wizard:{STR:3,DEF:2,INT:9,WIS:7,SPD:5,CHA:4,LCK:4},
+Rogue:{STR:5,DEF:3,INT:5,WIS:4,SPD:9,CHA:6,LCK:7},
+Healer:{STR:3,DEF:4,INT:6,WIS:9,SPD:4,CHA:7,LCK:5},
+Merchant:{STR:3,DEF:3,INT:6,WIS:5,SPD:5,CHA:8,LCK:8},
+Bard:{STR:3,DEF:2,INT:5,WIS:6,SPD:6,CHA:10,LCK:5}
+};
+const PRIMARY_STAT = {Warrior:“STR”,Wizard:“INT”,Rogue:“SPD”,Healer:“WIS”,Merchant:“CHA”,Bard:“CHA”};
+const STAT_COLORS = {STR:”#ef5350”,DEF:”#ffd54f”,INT:”#7c4dff”,WIS:”#66bb6a”,SPD:”#4fc3f7”,CHA:”#ff9800”,LCK:”#ce93d8”};
+const RARITY_COLOR = {Common:”#aaa”,Uncommon:”#66bb6a”,Rare:”#4fc3f7”,Legendary:”#ffd54f”,Mythic:”#ce93d8”,Cursed:”#ef5350”};
+const DANGER_COLORS = [””,”#66bb6a”,”#81c784”,”#ff9800”,”#ef5350”,”#b71c1c”];
+const DANGER_LABELS = [””,“Calm”,“Tense”,“Dangerous”,“Hostile”,“Extreme”];
+const ORIGINS = [“Dark Enchanted Forest”,“Crumbling Kingdom”,“Underground Caverns”,“Hollow’s Edge”,“Sunken Library”];
+
+const TRAIT_TIERS = [
+{level:“⚠ Weakened”,range:[1,4],color:”#ef5350”,bonus:-1},
+{level:“✓ Standard”,range:[5,9],color:”#aaa”,bonus:0},
+{level:“★ Strong”,range:[10,14],color:”#4fc3f7”,bonus:1},
+{level:“✦ Exceptional”,range:[15,19],color:”#ffd54f”,bonus:2},
+{level:“👑 LEGENDARY”,range:[20,20],color:”#ce93d8”,bonus:3}
+];
+
+const RACES = {
+“Dust-Walker”:{icon:“🏜️”,stats:{STR:0,DEF:0,INT:0,WIS:2,SPD:1,CHA:-2,LCK:0},ability:“Void-Scarred — Once/session, ignore a magical attack entirely.”,biological_quirk:“In darkness: full night vision. In sunlight: -1 to hit (photosensitive skin).”,lore:“Nomads who walked too close to the void, and the void walked back.”},
+“Garrison-Born”:{icon:“🛡️”,stats:{STR:1,DEF:2,INT:0,WIS:0,SPD:-1,CHA:0,LCK:0},ability:“Iron Discipline — Immune to Fear. +1 combat rolls beside an ally.”,biological_quirk:“Dense bones: 50% less blunt damage but sinks instantly in water.”,lore:“Descendants of a ruined empire who refuse to admit the war is over.”},
+“The Sunken”:{icon:“📜”,stats:{STR:-1,DEF:0,INT:2,WIS:0,SPD:0,CHA:2,LCK:1},ability:“Silver Tongue — 10% Black Market discount. Never surprised.”,biological_quirk:“Bioluminescent in total darkness. Runs the information economy.”,lore:“Archive scholars who never left the sinking library. Information is currency.”},
+“Aether-Kith”:{icon:“✨”,stats:{STR:-2,DEF:-1,INT:3,WIS:2,SPD:0,CHA:1,LCK:2},ability:“Arcane Conduit — Absorb a spell targeting you; add to next roll (once/session).”,biological_quirk:“Cannot wear metal armor without -2 INT. Born in a Hollow rift.”,lore:“Half-real beings shaped by the Hollow before birth. The void is their cradle.”},
+“Hollow-Touched”:{icon:“🌑”,stats:{STR:1,DEF:0,INT:1,WIS:0,SPD:0,CHA:-1,LCK:3},ability:“Void Sense — Automatically detect Hollow entities within 50ft.”,biological_quirk:“Sleep replaced by 4hr trance. Immune to dream-based magic.”,lore:“Survivors of the Hollow Pull who came back changed. Most don’t discuss how.”}
+};
+
+const COMPANION_TYPES = {
+“Void Hound”:{icon:“🐺”,hp:5,statBuff:{STR:1},active_ability:“Shadow Lunge — Intercept one incoming attack per session.”,passive_trait:“Pack Bond — +1 all combat rolls while active.”,maintenance:“Feeds on raw meat and negative energy. Cannot be healed by standard kits.”,behavior_quirk:“Does not sleep. Sits rigidly, staring into the darkest corner.”},
+“Scavenger Crow”:{icon:“🦅”,hp:3,statBuff:{LCK:1},active_ability:“Pilfer — Steal a small object up to 30ft without breaking stealth.”,passive_trait:“Grave Robber (+10% Loot Luck) — Auto-scavenge after every combat.”,maintenance:“Must be bribed with shiny objects or it drops your inventory items.”,behavior_quirk:“Mimics the last words of people it watched die.”},
+“Clockwork Mule”:{icon:“⚙️”,hp:8,statBuff:{DEF:1},active_ability:“Mobile Barricade — Lock joints; grant +2 DEF to allies using it as cover.”,passive_trait:“Tireless Hauler — +5 Inventory Slots.”,maintenance:“Cannot be healed by magic. Needs scrap parts and oil to repair.”,behavior_quirk:“Constantly vents steam. -1 group Stealth while moving.”},
+“Mender Sprite”:{icon:“💫”,hp:2,statBuff:{WIS:1},active_ability:“Cauterizing Sap — Heal 1d6 HP; target gets -1 to next attack from extreme pain.”,passive_trait:“Guardian Light — Once/session, stabilize player at 1 HP by sacrificing itself.”,maintenance:“Feeds on ambient magic. Takes double damage from AoE attacks.”,behavior_quirk:“Hums constantly. Light flashes violently when sensing danger.”}
+};
+
+const WORLD_LOCATIONS = [
+{id:“hq”,name:“Moon Squad HQ”,short:“HQ”,icon:“🏠”,color:”#ffd54f”,x:50,y:48,danger:1,desc:“The sanctuary of the Moon Squad. Safe, fortified, and growing.”,features:[“The Forge — Repair & Enchant”,“The Infirmary — Heal & Purify”,“The Ledger — Daily Shop”,“The Bunkhouse — Personal Quarters”],connectedTo:[“forest”,“kingdom”,“caverns”,“library”,“edge”]},
+{id:“forest”,name:“Dark Enchanted Forest”,short:“Forest”,icon:“🌲”,color:”#2e7d32”,x:18,y:28,danger:3,desc:“Ancient. Breathing. The trees here remember everything.”,features:[“Hollow-adjacent plant material”,“Ashen Pack territory”,“Forest caches hidden throughout”,“Sound travels strangely”],connectedTo:[“kingdom”,“edge”]},
+{id:“kingdom”,name:“The Crumbling Kingdom”,short:“Kingdom”,icon:“🏰”,color:”#c62828”,x:48,y:20,danger:2,desc:“What is left of an empire. The walls still stand in places.”,features:[“Garrison footlockers in ruins”,“Valdris holds the throne room”,“Kingdom vault accessible with key”,“Military remnants patrol unpredictably”],connectedTo:[“forest”,“caverns”,“library”]},
+{id:“caverns”,name:“Underground Caverns”,short:“Caverns”,icon:“⛏️”,color:”#6a1b9a”,x:36,y:64,danger:3,desc:“The deep dark beneath everything else.”,features:[“Hollow ore deposits”,“Thessaly operates from deep sections”,“Cavern mushroom clusters”,“Deepest sections never fully mapped”],connectedTo:[“kingdom”,“library”]},
+{id:“edge”,name:“The Hollow’s Edge”,short:“Edge”,icon:“🌀”,color:”#9c27b0”,x:74,y:36,danger:5,desc:“Where the Hollow ends and whatever comes next begins.”,features:[“Rift deposits appear unpredictably”,“The Null Warden holds the boundary”,“Time moves differently here”,“Transition zone materials”],connectedTo:[“forest”,“library”]},
+{id:“library”,name:“The Sunken Library”,short:“Library”,icon:“📚”,color:”#1565c0”,x:64,y:68,danger:2,desc:“Partially submerged. Still functional. Still sinking.”,features:[“Scholar cases throughout readable levels”,“The Sink in flooded lower levels”,“Restricted archive”,“Research desks surface occasionally”],connectedTo:[“kingdom”,“caverns”,“edge”]}
+];
+
+const VILLAIN_LORE = [
+{id:“gravenor”,name:“Gravenor”,title:“The Ashen Alpha”,icon:“🐺”,color:”#9c27b0”,motivation:“Reclaiming something the Hollow took from him.”,lore:“A Warrior stationed at the Forest edge. His unit didn’t come back. He did — changed. Leads the Ashen Pack not by command, but by agreement. Patient in a way that makes him more dangerous than rage.”,strengths:[“Regenerates 2 HP/round in Forest or low-light”,“Cannot be flanked — senses all within 40ft”,“Pack Coordination — wolves +1 when above half HP”,“Standard weapons deal -1 damage”],weaknesses:[“Silver bypasses defences, deals +2”,“Fire — cannot regenerate”,“His honour — cannot pursue formal surrender”],phases:[{phase:1,name:“The Watcher”,hp:“80 HP — Full”,desc:“Observes. Tests player responses. Will speak if approached with respect.”,color:”#4fc3f7”},{phase:2,name:“The Hunter”,hp:“Below 60 HP”,desc:“Engages directly. Targets who did most damage to his pack.”,color:”#ff9800”},{phase:3,name:“The Feral”,hp:“Below 30 HP”,desc:“The man recedes. Reckless, devastating. Pack members scatter.”,color:”#ef5350”}],loot:[{item:“Ashen Fang (Arc weapon material)”,chance:“Phase 2 — 70%”},{item:“Pack Sigil (unlocks Ashen Pack faction)”,chance:“Phase 3 — 50%”},{item:“Gravenor’s Scar (cosmetic mark)”,chance:“Combat completion — 100%”}]},
+{id:“valdris”,name:“Valdris”,title:“The Chancellor of Ruins”,icon:“🏰”,color:”#c62828”,motivation:“Restoring the Kingdom to its former glory by any means necessary.”,lore:“Was a mid-ranking scribe before the Kingdom fell. He didn’t die — he adapted. Now rules the throne room of the ruined palace, convinced he is the legitimate heir to an empire that has been dead for centuries.”,strengths:[“Kingdom terrain mastery — +2 all rolls in ruins”,“Garrison loyalty — calls 2d4 soldier reinforcements once/fight”,“Vault Key — can seal rooms remotely”,“Iron Will — immune to fear and social manipulation”],weaknesses:[“Isolated — no allies outside the Kingdom”,“The Records — his actual lineage disproves his claim”,“Direct honesty — cannot process sincere diplomacy; it breaks his worldview”],phases:[{phase:1,name:“The Authority”,hp:“60 HP”,desc:“Commands. Uses soldiers as shields. Will parley from a position of false power.”,color:”#4fc3f7”},{phase:2,name:“The Desperate”,hp:“Below 35 HP”,desc:“Abandons strategy. Personal combat. Seals exits.”,color:”#ef5350”}],loot:[{item:“Chancellor Ring (opens Kingdom Vault)”,chance:“Defeat — 100%”},{item:“Kingdom Signet (faction access)”,chance:“Defeat — 100%”},{item:“Ruined Crown (cosmetic, Legendary)”,chance:“Parley success — 30%”}]},
+{id:“thessaly”,name:“Thessaly”,title:“The Architect of the Deep”,icon:“⛏️”,color:”#6a1b9a”,motivation:“Mapping and ultimately controlling the entire Cavern system.”,lore:“A former Rogue who discovered the Caverns weren’t natural. She has spent years placing traps, cataloguing creatures, and negotiating with things in the deep that have no names. She knows every inch of the underground.”,strengths:[“Home terrain — +3 all rolls in Caverns”,“Trap Mastery — every room has at least one trap players don’t know about”,“Creature Accord — can call cave entities”,“Darkness dependency — functions at full capacity in complete dark”],weaknesses:[“Zero combat ability in direct light (sunlight negates all bonuses)”,“The Map — she needs it. If players have pieces of it she’s looking for them”,“Trust — she respects competence. A sufficiently skilled party can negotiate”],phases:[{phase:1,name:“The Observer”,hp:“55 HP”,desc:“Watches through her trap network. Won’t engage directly unless cornered.”,color:”#4fc3f7”},{phase:2,name:“The Architect”,hp:“Below 30 HP”,desc:“Full trap activation. Environment becomes hostile. Personal combat only as last resort.”,color:”#9c27b0”}],loot:[{item:“Master Cavern Map fragment”,chance:“Phase 2 — 80%”},{item:“Thessaly’s Lockpick Set (Rare tool)”,chance:“Non-lethal resolution — 60%”},{item:“Deep Accord Sigil (Cavern creatures neutral)”,chance:“Negotiation success — 100%”}]},
+];
+
+const CLASS_LORE = {
+Warrior:{tagline:“They showed up when things were falling apart. They haven’t left.”,overview:“Warriors in the Hollow Realm are defined by persistence more than power. They are the ones who were still standing when everything else stopped.”,strengths:[“Highest HP (12) — takes punishment that destroys others”,“Natural protector — Gift Power shields allies from damage”,“DEF 7 — most durable in sustained combat”,“Intimidation baseline — NPCs defer in tense situations”],weaknesses:[“INT 3 — magical challenges are hard”,“Social finesse is limited — blunt by default”,“Dependent on allies for healing”],giftPower:“Shield Block — Absorb incoming damage for an ally. Completely. Once per session. No roll required.”,playstyle:“Warriors anchor the party. They take the hit, hold the line, buy time.”,lore:“In the Kingdom records, Warriors appear in every account of catastrophe. Not as heroes — as the last ones out.”},
+Wizard:{tagline:“Magic in the Hollow Realm is not a skill. It is a conversation.”,overview:“Wizards trade safety for capability. INT 9 and a spell kit that scales into things other classes cannot touch. The tradeoff is 7 HP.”,strengths:[“INT 9 — unmatched magical capability”,“Arcane Surge doubles next roll effect”,“Access to forbidden knowledge”,“Hollow interactions are deeper”],weaknesses:[“7 HP — dies fast if targeted”,“DEF 2 — near-zero physical defence”,“Spell fumbles have consequences”],giftPower:“Arcane Surge — Double the effect of the next roll. Any roll. Once per session.”,playstyle:“Wizards change what is possible. They cannot take damage. They can make the difference.”,lore:“The Sunken Library is believed to have been a Wizard’s construction. The Library has opinions about Wizards.”},
+Rogue:{tagline:“Rogues exist in the space between things.”,overview:“SPD 9 and LCK 7 make Rogues the most unpredictable class. They solve problems sideways.”,strengths:[“SPD 9 — fastest class, initiative always”,“LCK 7 — the Hollow bends in their favour”,“Shadow Step avoids one consequence entirely”,“Stealth and deception scale well”],weaknesses:[“DEF 3 — fragile in direct confrontation”,“WIS 4 — strange Hollow effects hit harder”,“Solo focus can leave party unsupported”],giftPower:“Shadow Step — Avoid one consequence entirely. No roll required. Once per session.”,playstyle:“Rogues do not fight fair. They should not. The best use the environment, the exits, the other people in the room.”,lore:“The Underground Caverns were mapped by a Rogue whose name appears in no official record.”},
+Healer:{tagline:“They have seen the worst the Hollow can do. They came back anyway.”,overview:“WIS 9 and the only class with death prevention in their Gift Power. They are the difference between a session ending and continuing.”,strengths:[“WIS 9 — reads situations others miss”,“Miracle Touch prevents death — no roll”,“Social trust is automatic in distress”,“The Hollow respects them most”],weaknesses:[“Not a combat class — vulnerable alone”,“STR 3 — cannot force their way through anything”,“Their value makes them a target”],giftPower:“Miracle Touch — Restore a downed character to 1 HP. Instant. No roll. Once per session.”,playstyle:“Healers win sessions that should have ended. Their job is keeping the party alive.”,lore:“Every documented resurrection in the Hollow Realm involved a Healer being present. This is not a coincidence.”},
+Merchant:{tagline:“Everything has a price. They are the one who set it.”,overview:“CHA 8 and LCK 8 — highest combined social stats. Merchants negotiate, and when they cannot, they find someone who will.”,strengths:[“Highest pack capacity (12)”,“CHA 8 + LCK 8 — social and economic dominance”,“Black Market creates mid-session options”,“Trade route knowledge is irreplaceable”],weaknesses:[“DEF 3 — fragile physically”,“STR 3 — cannot hold their own in combat”,“Dependent on the economy being functional”],giftPower:“Black Market — Purchase one special item mid-session from a contact. Once per session.”,playstyle:“Merchants make the impossible affordable. Every problem is a transaction.”,lore:“The most expensive transaction in the Hollow Realm was facilitated by a Merchant whose title was The Hollow’s Price.”},
+Bard:{tagline:“Bards came to the Hollow Realm to document it. Or to escape something.”,overview:“CHA 10 — highest single stat in the game. Bards shape how the story is told, which means shaping what actually happened.”,strengths:[“CHA 10 — unmatched social capability”,“Encore re-rolls any failed roll”,“The Hollow responds to performances in Hollow locations”,“Story-shaping extends beyond mechanics”],weaknesses:[“DEF 2 — lowest defence”,“STR 3 — physically least capable”,“Fame creates recognition problems”],giftPower:“Encore — Re-roll any failed roll. Any. Once per session.”,playstyle:“Bards play the game at a different layer. Combat is a story. NPCs are characters. The Hollow is an audience.”,lore:“The Hollow Realm’s Memory title has been held once. That Bard’s work is what gave the Hollow its current shape.”}
+};
+
+const RULES_SECTIONS = [
+{id:“economy”,title:“💰 Economy & Terms”,content:“THE LIVE ECONOMY:\n1,000 TikTok Coins = $15.02 CAD (includes 5% AB Tax).\nPayPal grants an 80% discounted rate.\n\nCOMMON COSTS:\n• Character Forge — 1,000 coins / $13.00 PayPal\n• Minor Roll — 100 coins / $2.00 PayPal\n• Standard Action — 500 coins / $7.00 PayPal\n• First Re-Roll — 500 coins / $7.00 PayPal\n• Second Re-Roll — 1,500 coins / $19.00 PayPal\n• Protection Mode — 1,000 coins / $13.00 PayPal\n• Full Resurrection — 6,000 coins / $73.00 PayPal\n• Epic World Action — 29,999 coins / $361.00 PayPal\n\nMISFIRE POLICY: All gifts are final. No refunds for misfires. Lag is a Hollow Anomaly.”},
+{id:“mechanics”,title:“🎲 Core Mechanics”,content:“THE D20 SYSTEM:\n1 = FUMBLE (Catastrophic backfire, item degrades)\n2–4 = FAIL (Action fails entirely)\n5–9 = WEAK HIT (Partial success + complication)\n10–14 = SUCCESS (Clean success)\n15–19 = STRONG HIT (Success + bonus effect)\n20 = CRITICAL (Legendary outcome, triggers special mechanics)\n\nYOUR POWER FORMULA:\nBase Class + Race Bonus + Equipped Gear + HQ Rest Buff - Active Curses = Total Stat\n\nThe GM Suite calculates this automatically.”},
+{id:“hq”,title:“🏠 HQ & Companions”,content:“MOON SQUAD HQ:\n• The Forge: Weapons degrade on Fumble (Pristine → Worn → Damaged → Broken). Broken = 0 damage. Pay to repair or socket Enchantments.\n• Personal Quarters: Upgrade Bunk, Lockbox, and Hearth. Upgraded Lockbox provides % protection against Box Battle theft.\n\nCOMPANIONS (1,000 Coins / $13.00 PayPal):\nLoyalty pets that provide passive buffs. In combat, they have tiny HP bars. At 0 HP, they flee to HQ, stripping buffs until you pay the Infirmary.\n\nOrphaned Companions: If an owner Permanently Dies, the companion wanders the map as a world encounter.”},
+{id:“combat”,title:“⚔️ Combat & Box Battles”,content:“BOX BATTLES:\nTikTok Live battles between two players. 500 coin minimum.\n• Declare your target before the timer starts.\n• Above 5k coins: Winner gets 60% of total.\n• Below 5k coins: Winner gets 40% of total.\n\nCONSEQUENCE LADDER:\n• MINOR (<5k gap): Lose title OR stat debuff\n• MODERATE (5k-9.9k gap): Cursed 2 sessions OR item stolen\n• MAJOR (10k-19.9k gap): Exile OR servant\n• SEVERE (20k-44.9k gap): Killed OR curse + exile + theft\n\nRAID SPLIT POTS: Successful Tier 3/4 raids split 30,000 coins among surviving participants.”},
+{id:“curses”,title:“💀 Death & Void Infections”,content:“DEATH VS DOWNED:\nAt 0 HP, you are Downed. A Healer can revive you this session. If session ends before healing, you are Permanently Dead. Name retired forever. Pay 6,000 coins for Full Resurrection or roll a new character.\n\nVOID INFECTIONS:\nLooting high-danger zones (especially The Hollow’s Edge) risks Void-Touched items. Massive power boost + severe negative stat modifier. Pay purification fee at HQ, or risk a Healer cleansing in the field (can backfire and curse the Healer).”}
+];
+
+const FAQ = [
+{q:“Can I join mid-arc or mid-session?”,a:“Yes. Forge a character for 1,000 coins ($13.00 PayPal). You will spawn at the HQ or nearest safe zone at the start of the next open-world phase.”},
+{q:“What happens if I miss a live session?”,a:“Your character remains in the world. To prevent them from being killed or targeted in Box Battles, purchase Protection Mode (1,000 coins) per session missed.”},
+{q:“Can I betray another player?”,a:“Yes. No declaration to the GM is required. The betrayal happens live, the d20 rolls, and the Domino Rule applies. It cannot be undone.”},
+{q:“What is the Domino Rule?”,a:“Every significant action creates permanent ripple effects. A betrayal changes relationships. A death shifts faction balance. Nothing in the Hollow Realm happens in isolation.”},
+{q:“I gifted the wrong Box Battle. Can I get a refund?”,a:“No. All actions are final. Box battle misfires are canon mistakes made in the heat of combat. Lag is an in-universe Hollow Anomaly.”},
+{q:“How does the PayPal discount work?”,a:“Bypassing TikTok allows an 80% discounted rate. 1,000 TikTok coins = ~$15.02 CAD. Via PayPal, that drops to $13.00 CAD.”},
+{q:“How do Box Battle payouts work?”,a:“Win a battle, receive a payout in your own live stream. Above 5,000 coins: you receive 60% of total. Below 5,000 coins: you receive 40%.”},
+];
+
+const ROLL_PURPOSES = {
+combat:{label:“⚔️ Combat”,color:”#ef5350”,options:[“Attack roll”,“Counter-attack”,“Sneak attack”,“Defensive strike”,“Power Strike”,“Boss Phase transition”,“Pack coordination”]},
+skill:{label:“🔍 Skill Check”,color:”#4fc3f7”,options:[“Stealth check”,“Lockpicking”,“Persuasion”,“Intimidation”,“Deception”,“Perception”,“Arcane knowledge”,“Healing check”,“Negotiation”,“Tracking”]},
+save:{label:“🛡️ Saving Throw”,color:”#ffd54f”,options:[“Death save”,“Curse resist”,“Hollow Pull resist”,“Fear resist”,“Poison resist”,“Trap avoid”,“Environmental hazard”]},
+magic:{label:“✨ Spell”,color:”#7c4dff”,options:[“Spell cast”,“Arcane Surge”,“Counter-spell”,“Hollow channelling”,“Void touch”,“Entity communication”]},
+social:{label:“💬 Social”,color:”#ff9800”,options:[“NPC negotiation”,“Bribe attempt”,“Deception check”,“Alliance declaration”,“Betrayal consequence”,“Faction standing roll”]},
+explore:{label:“🗺️ Explore”,color:”#66bb6a”,options:[“Search area”,“Chest discovery”,“Trap detection”,“Loot roll”,“Document recovery”,“Hollow rift interaction”]},
+heal:{label:“💚 Healing”,color:”#66bb6a”,options:[“Healing roll”,“Stabilise downed”,“Curse removal”,“Resurrection roll”,“Emergency revival”]},
+raid:{label:“💥 Raid”,color:”#ff9800”,options:[“Strike action”,“Defend action”,“Search action”,“Special ability”,“Power Strike”,“Boss encounter”,“Extract attempt”,“Breach roll”]},
+destiny:{label:“🌀 Destiny”,color:”#ce93d8”,options:[“Destiny Thread trigger”,“Shadow Trait activation”,“Hollow Pull resist”,“Enchantment check”,“Warden Test”]},
+custom:{label:“📝 Custom”,color:”#bbb”,options:[]}
+};
+
+const LOG_TYPES = {
+session:{label:“Session”,color:”#ffd54f”,icon:“📋”},
+dice:{label:“Dice”,color:”#ce93d8”,icon:“🎲”},
+hp:{label:“HP”,color:”#66bb6a”,icon:“❤️”},
+death:{label:“Death”,color:”#ef5350”,icon:“💀”},
+action:{label:“Action”,color:”#4fc3f7”,icon:“⚡”},
+gift:{label:“Gift”,color:”#ff9800”,icon:“🎁”},
+battle:{label:“Battle”,color:”#e91e63”,icon:“⚔️”},
+item:{label:“Item”,color:”#81c784”,icon:“📦”},
+note:{label:“Note”,color:”#bbb”,icon:“📝”},
+consequence:{label:“Effect”,color:”#9c27b0”,icon:“🌀”},
+};
+
+const WANTED_BOUNTIES = [
+{id:“b1”,name:“The Ashen Deserter”,type:“Rogue Warrior”,reward:“5,000 Coins”,location:“Dark Enchanted Forest”,dc:14},
+{id:“b2”,name:“Void-Touched Smuggler”,type:“Corrupted Merchant”,reward:“Rare Weapon”,location:“Underground Caverns”,dc:15},
+{id:“b3”,name:“The Mad Alchemist”,type:“Rogue Healer”,reward:“Legendary Enchantment”,location:“Crumbling Kingdom”,dc:16},
+{id:“b4”,name:“Cultist of the Sink”,type:“Zealot”,reward:“8,000 Coins”,location:“Sunken Library”,dc:15},
+{id:“b5”,name:“Wandering Null-Spawn”,type:“Entity”,reward:“Mythic Artifact”,location:“Hollow’s Edge”,dc:18}
+];
+
+const BASE_ROOMS = {
+vault:{name:“The Vault”,icon:“🔒”,desc:“Stores items safely between sessions.”,tiers:[{level:1,cost:0,bonus:“Basic storage — 20 item capacity”},{level:2,cost:5000,bonus:“50 item capacity. Items organised by type.”},{level:3,cost:15000,bonus:“100 item capacity. Condition degrades slower.”}]},
+barracks:{name:“The Barracks”,icon:“🪖”,desc:“Housing for guard NPCs.”,tiers:[{level:1,cost:3000,bonus:“2 guard slots. Base defended on 12+.”},{level:2,cost:8000,bonus:“4 guard slots. Defended on 10+. Guards can patrol.”},{level:3,cost:20000,bonus:“6 guards. Defended on 8+. Guards counter-attack.”}]},
+forge:{name:“The Forge”,icon:“🔨”,desc:“Repair and enchant weapons.”,tiers:[{level:1,cost:2000,bonus:“Repair weapons at 1,500c each.”},{level:2,cost:6000,bonus:“Repair at 750c. Socket one Enchantment slot.”},{level:3,cost:18000,bonus:“Repair at 300c. Two Enchantment slots. Self-repair on 16+.”}]},
+infirmary:{name:“The Infirmary”,icon:“💊”,desc:“Heal and purify conditions.”,tiers:[{level:1,cost:4000,bonus:“Cure standard poisons/curses at 500c each.”},{level:2,cost:10000,bonus:“Cure Void infections at 2,000c. Heal companions.”},{level:3,cost:25000,bonus:“Full-service. Attempt in-field resurrection 10+.”}]},
+watchtower:{name:“The Watchtower”,icon:“🗼”,desc:“Early warning system.”,tiers:[{level:1,cost:3500,bonus:“24hr warning on hostile approach.”},{level:2,cost:9000,bonus:“Player locations tracked. Map updates in real time.”},{level:3,cost:22000,bonus:“Villain movement tracked. Intercept planning unlocked.”}]}
+};
+
+const PERSONAL_QUARTERS = {
+bunk:{name:“The Bunk”,icon:“🛏️”,tiers:[{cost:1000,bonus:“Session-start +1 to first roll”},{cost:2500,bonus:”+2 Max HP for the session”},{cost:5000,bonus:“Full HP restoration every session start”}]},
+lockbox:{name:“The Lockbox”,icon:“🔐”,tiers:[{cost:1500,bonus:“25% protection from Box Battle item theft”},{cost:3500,bonus:“50% protection. Stolen items auto-recover after 2 sessions.”},{cost:7000,bonus:“75% protection. Vault-grade security.”}]},
+hearth:{name:“The Hearth”,icon:“🔥”,tiers:[{cost:2000,bonus:“Companion heals 1 HP/session automatically”},{cost:4000,bonus:“Companion +1 to all passive rolls for the session”},{cost:8000,bonus:“Companion fully restored every session start”}]}
+};
+
+const RESIDENT_ROLES = {
+guard:{icon:“🛡️”,label:“Guard”,bonus:”+1 to base defense roll”},
+medic:{icon:“💊”,label:“Medic”,bonus:“Reduce healing costs by 10%”},
+scout:{icon:“👁️”,label:“Scout”,bonus:”+1 Watchtower detection range”},
+quartermaster:{icon:“📦”,label:“Quartermaster”,bonus:“Vault capacity +5 slots”},
+smith:{icon:“🔨”,label:“Smith”,bonus:“Reduce Forge repair costs by 15%”},
+spymaster:{icon:“🕵️”,label:“Spymaster”,bonus:“Once/session: learn one villain’s current action”}
+};
+
+const LEDGER_POOLS = {
+bargain:[“Iron Rations x3”,“Healing Salve”,“Blank Scroll”,“Lockpicks”,“Torch x5”,“Rope 50ft”,“Vial of Hollow Dust”,“Common Dagger”],
+essential:[“Hollow Ore x2”,“Enchanted Bandage”,“Stealth Cloak”,“Scout’s Compass”,“Alchemist’s Flask”,“Reinforced Pack”],
+artifact:[“Void-Touched Coin”,“Ashen Fang Shard”,“Library Access Key”,“Edge Fragment”,“Moon Squad Challenge Coin (Replica)”,“Drowned Archive Text”]
+};
+
+/* ═══════════════════════════════════════════════════════════════════
+HELPERS
+═══════════════════════════════════════════════════════════════════ */
+const esc = (s) => String(s || “”).replace(/[<>&”]/g, c => ({”<”:”<”,”>”:”>”,”&”:”&”,’”’:”"”}[c]));
+const d20 = () => Math.floor(Math.random() * 20) + 1;
+const clamp = (v, min, max) => Math.min(max, Math.max(min, v));
+const rangeLabel = (r) => r[0] === r[1] ? String(r[0]) : r[0] + “–” + r[1];
+
+function getDiceDisplay(r) {
+if (!r) return null;
+if (r === 1) return {label:“💀 FUMBLE”,desc:“Catastrophic backfire.”,bg:”#2a0505”,glow:”#ef5350”};
+if (r <= 4) return {label:“✗ FAIL”,desc:“Action fails entirely.”,bg:”#1a0505”,glow:”#ef5350”};
+if (r <= 9) return {label:“⚠ WEAK HIT”,desc:“Partial — something goes wrong.”,bg:”#1a0e00”,glow:”#ff9800”};
+if (r <= 14) return {label:“✓ SUCCESS”,desc:“Clean success.”,bg:”#041a06”,glow:”#4caf50”};
+if (r <= 19) return {label:“★ STRONG HIT”,desc:“Success + bonus effect.”,bg:”#021020”,glow:”#4fc3f7”};
+return {label:“⚡ CRITICAL!”,desc:“LEGENDARY. ANNOUNCE IT.”,bg:”#160520”,glow:”#ce93d8”};
+}
+
+function getPlayerStats(p) {
+const base = CLASS_BASE_STATS[p.cls] || {STR:5,DEF:5,INT:5,WIS:5,SPD:5,CHA:5,LCK:5};
+const trait = TRAIT_TIERS.find(t => t.level === p.traitLevel);
+const traitBonus = trait ? trait.bonus : 0;
+const raceStats = p.race && RACES[p.race] ? RACES[p.race].stats : {STR:0,DEF:0,INT:0,WIS:0,SPD:0,CHA:0,LCK:0};
+const primary = PRIMARY_STAT[p.cls] || “STR”;
+const companion = p.companion && COMPANION_TYPES[p.companion.type];
+let finalStats = {};
+for (const s in base) {
+let v = base[s] + raceStats[s] + (s === primary ? traitBonus : 0);
+if (companion && companion.statBuff && companion.statBuff[s] && p.companion.status === “active”) v += companion.statBuff[s];
+if (p.isHoF && s === “CHA”) v += 3;
+finalStats[s] = (p.statOverrides && p.statOverrides[s] !== undefined) ? p.statOverrides[s] : v;
+}
+return finalStats;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+SKYRIM / PARCHMENT DESIGN SYSTEM
+═══════════════════════════════════════════════════════════════════ */
+const CSS = `
+@import url(‘https://fonts.googleapis.com/css2?family=MedievalSharp&family=Cinzel+Decorative:wght@400;700;900&family=Cinzel:wght@400;600;700&family=IM+Fell+English:ital@0;1&family=Uncial+Antiqua&display=swap’);
+
+:root {
+–parch: #f2e8c9;
+–parch-dark: #e8d9a8;
+–parch-shadow: #c9b07a;
+–ink: #2c1810;
+–ink-faded: #5a3d2b;
+–scroll-bg: #1a0e08;
+–scroll-mid: #241408;
+–ember: #c8813a;
+–ember-glow: #f0a855;
+–void: #8b5cf6;
+–void-glow: #a78bfa;
+–blood: #9b1b1b;
+–forest: #2d5016;
+–gold: #c9a227;
+–gold-bright: #f0c040;
+–iron: #6b7280;
+–frost: #93c5fd;
+–border-rune: rgba(200,129,58,0.4);
+–border-rune-bright: rgba(240,168,85,0.7);
+–shadow-deep: rgba(0,0,0,0.6);
+–shadow-rune: 0 0 20px rgba(200,129,58,0.15);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+html, body { height: 100%; overflow: hidden; }
+
+body {
+font-family: ‘IM Fell English’, Georgia, serif;
+background: var(–scroll-bg);
+color: var(–ink);
+min-height: 100vh;
+overflow: hidden;
+}
+
+/* ── SCROLLBAR ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: rgba(0,0,0,0.2); }
+::-webkit-scrollbar-thumb { background: var(–ember); border-radius: 3px; }
+
+/* ── APP SHELL ── */
+#hollow-app {
+display: flex;
+height: 100vh;
+width: 100vw;
+overflow: hidden;
+position: relative;
+}
+
+/* ── PARCHMENT TEXTURE OVERLAY ── */
+#hollow-app::before {
+content: ‘’;
+position: fixed;
+inset: 0;
+background-image:
+url(“data:image/svg+xml,%3Csvg xmlns=‘http://www.w3.org/2000/svg’ width=‘300’ height=‘300’%3E%3Cfilter id=‘n’%3E%3CfeTurbulence type=‘fractalNoise’ baseFrequency=‘0.65’ numOctaves=‘3’ stitchTiles=‘stitch’/%3E%3CfeColorMatrix type=‘saturate’ values=‘0’/%3E%3C/filter%3E%3Crect width=‘300’ height=‘300’ filter=‘url(%23n)’ opacity=‘0.035’/%3E%3C/svg%3E”);
+pointer-events: none;
+z-index: 9999;
+opacity: 0.6;
+}
+
+/* ── SIDE NAV (desktop) ── */
+.sidenav {
+width: 220px;
+min-width: 220px;
+background: linear-gradient(180deg, #0f0804 0%, #1a0e08 40%, #0a0604 100%);
+border-right: 2px solid var(–ember);
+display: flex;
+flex-direction: column;
+overflow: hidden;
+position: relative;
+flex-shrink: 0;
+}
+.sidenav::before {
+content: ‘’;
+position: absolute;
+inset: 0;
+background: repeating-linear-gradient(0deg, transparent, transparent 59px, rgba(200,129,58,0.06) 60px);
+pointer-events: none;
+}
+
+.sidenav-logo {
+padding: 20px 16px 16px;
+border-bottom: 1px solid var(–border-rune);
+text-align: center;
+}
+.sidenav-logo h1 {
+font-family: ‘Cinzel Decorative’, ‘Cinzel’, serif;
+font-size: 0.75rem;
+color: var(–ember-glow);
+letter-spacing: 3px;
+text-transform: uppercase;
+text-shadow: 0 0 12px rgba(200,129,58,0.6);
+line-height: 1.4;
+}
+.sidenav-logo .subtitle {
+font-family: ‘Cinzel’, serif;
+font-size: 0.45rem;
+color: var(–parch-shadow);
+letter-spacing: 2px;
+margin-top: 4px;
+}
+.sidenav-logo .session-pip {
+display: inline-flex;
+align-items: center;
+gap: 5px;
+margin-top: 8px;
+font-family: ‘Cinzel’, serif;
+font-size: 0.5rem;
+color: var(–parch-shadow);
+letter-spacing: 1px;
+}
+.session-dot {
+width: 6px; height: 6px; border-radius: 50%;
+background: #4caf50;
+box-shadow: 0 0 8px #4caf50;
+animation: pulse-dot 1.5s ease-in-out infinite;
+}
+.session-dot.off { background: #444; box-shadow: none; animation: none; }
+@keyframes pulse-dot { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* ── SCROLL-STYLE NAV ITEMS ── */
+.nav-section {
+padding: 10px 0 4px;
+}
+.nav-section-label {
+font-family: ‘Cinzel’, serif;
+font-size: 0.38rem;
+color: var(–ember);
+letter-spacing: 3px;
+text-transform: uppercase;
+padding: 0 16px 4px;
+opacity: 0.7;
+}
+.nav-item {
+display: flex;
+align-items: center;
+gap: 10px;
+padding: 9px 16px;
+cursor: pointer;
+position: relative;
+transition: all 0.15s;
+border-left: 3px solid transparent;
+font-family: ‘Cinzel’, serif;
+font-size: 0.62rem;
+color: var(–parch-shadow);
+letter-spacing: 0.5px;
+user-select: none;
+}
+.nav-item:hover {
+background: rgba(200,129,58,0.08);
+color: var(–parch);
+border-left-color: rgba(200,129,58,0.4);
+}
+.nav-item.active {
+background: rgba(200,129,58,0.12);
+color: var(–ember-glow);
+border-left-color: var(–ember);
+}
+.nav-item.active::after {
+content: ‘’;
+position: absolute;
+right: 0; top: 50%;
+transform: translateY(-50%);
+width: 0; height: 0;
+border-top: 6px solid transparent;
+border-bottom: 6px solid transparent;
+border-right: 6px solid var(–ember);
+}
+.nav-icon { font-size: 0.95rem; width: 20px; text-align: center; flex-shrink: 0; }
+.nav-divider { height: 1px; background: linear-gradient(90deg, transparent, var(–border-rune), transparent); margin: 6px 12px; }
+
+/* ── MAIN CONTENT ── */
+.main-content {
+flex: 1;
+display: flex;
+flex-direction: column;
+overflow: hidden;
+background: linear-gradient(135deg, #0f0804 0%, #1a0e08 50%, #0d0a04 100%);
+}
+
+/* ── MOBILE TOP BAR ── */
+.topbar {
+display: none;
+background: linear-gradient(90deg, #0f0804, #1a0e08);
+border-bottom: 1px solid var(–ember);
+padding: 10px 14px;
+align-items: center;
+justify-content: space-between;
+flex-shrink: 0;
+}
+.topbar-title {
+font-family: ‘Cinzel Decorative’, serif;
+font-size: 0.65rem;
+color: var(–ember-glow);
+letter-spacing: 2px;
+}
+.topbar-menu-btn {
+background: none;
+border: 1px solid var(–border-rune);
+color: var(–ember);
+padding: 5px 10px;
+cursor: pointer;
+font-size: 0.7rem;
+border-radius: 3px;
+font-family: ‘Cinzel’, serif;
+}
+
+/* ── MOBILE BOTTOM NAV ── */
+.bottom-nav {
+display: none;
+background: #0a0604;
+border-top: 1px solid var(–ember);
+overflow-x: auto;
+scrollbar-width: none;
+flex-shrink: 0;
+}
+.bottom-nav::-webkit-scrollbar { display: none; }
+.bottom-nav-inner {
+display: flex;
+min-width: max-content;
+}
+.bnav-item {
+display: flex;
+flex-direction: column;
+align-items: center;
+gap: 2px;
+padding: 7px 12px;
+cursor: pointer;
+border-bottom: 2px solid transparent;
+transition: all 0.15s;
+font-family: ‘Cinzel’, serif;
+font-size: 0.4rem;
+color: #5a3d2b;
+letter-spacing: 0.5px;
+white-space: nowrap;
+user-select: none;
+}
+.bnav-item.active { color: var(–ember-glow); border-bottom-color: var(–ember); }
+.bnav-icon { font-size: 1rem; }
+
+/* ── PANEL AREA ── */
+.panel-area {
+flex: 1;
+overflow-y: auto;
+overflow-x: hidden;
+padding: 20px;
+}
+
+/* ── PARCHMENT SCROLL (section wrapper) ── */
+.scroll-panel {
+background: linear-gradient(160deg, #f5e9c5 0%, #ecd99a 40%, #f2e4b8 70%, #e8d48e 100%);
+border: 1px solid var(–parch-shadow);
+border-radius: 4px;
+position: relative;
+box-shadow: 0 4px 20px rgba(0,0,0,0.5), inset 0 0 40px rgba(180,130,60,0.1);
+margin-bottom: 16px;
+}
+.scroll-panel::before {
+content: ‘’;
+position: absolute;
+top: 0; left: 0; right: 0;
+height: 8px;
+background: linear-gradient(90deg, #c9a227, #f0c040, #c9a227);
+border-radius: 4px 4px 0 0;
+}
+.scroll-panel::after {
+content: ‘’;
+position: absolute;
+bottom: 0; left: 0; right: 0;
+height: 8px;
+background: linear-gradient(90deg, #c9a227, #f0c040, #c9a227);
+border-radius: 0 0 4px 4px;
+}
+.scroll-inner { padding: 20px 18px; }
+
+/* ── DARK CARD ── */
+.dark-card {
+background: rgba(15,8,4,0.95);
+border: 1px solid var(–border-rune);
+border-radius: 4px;
+padding: 16px;
+margin-bottom: 12px;
+box-shadow: var(–shadow-rune);
+position: relative;
+}
+.dark-card::before {
+content: ‘✦’;
+position: absolute;
+top: 6px; left: 8px;
+font-size: 0.4rem;
+color: var(–ember);
+opacity: 0.5;
+}
+.dark-card::after {
+content: ‘✦’;
+position: absolute;
+top: 6px; right: 8px;
+font-size: 0.4rem;
+color: var(–ember);
+opacity: 0.5;
+}
+.dark-card.glow { box-shadow: 0 0 25px rgba(200,129,58,0.2), var(–shadow-rune); border-color: var(–border-rune-bright); }
+
+/* ── RUNE DIVIDER ── */
+.rune-divider {
+display: flex;
+align-items: center;
+gap: 10px;
+margin: 14px 0;
+}
+.rune-divider::before, .rune-divider::after {
+content: ‘’;
+flex: 1;
+height: 1px;
+background: linear-gradient(90deg, transparent, var(–border-rune), transparent);
+}
+.rune-divider span {
+font-family: ‘Cinzel’, serif;
+font-size: 0.45rem;
+color: var(–ember);
+letter-spacing: 3px;
+text-transform: uppercase;
+opacity: 0.7;
+}
+
+/* ── SECTION TITLE ── */
+.section-title {
+font-family: ‘Cinzel’, serif;
+font-size: 0.62rem;
+color: var(–ember-glow);
+letter-spacing: 3px;
+text-transform: uppercase;
+margin-bottom: 12px;
+border-bottom: 1px solid var(–border-rune);
+padding-bottom: 6px;
+}
+
+/* ── SCROLL TABS (Skyrim accordion-style) ── */
+.scroll-tabs {
+display: flex;
+gap: 4px;
+flex-wrap: wrap;
+margin-bottom: 14px;
+}
+.scroll-tab {
+padding: 6px 14px;
+cursor: pointer;
+background: rgba(15,8,4,0.8);
+border: 1px solid var(–border-rune);
+border-bottom: none;
+font-family: ‘Cinzel’, serif;
+font-size: 0.55rem;
+color: var(–parch-shadow);
+letter-spacing: 1px;
+position: relative;
+transition: all 0.15s;
+clip-path: polygon(0 0, calc(100% - 6px) 0, 100% 6px, 100% 100%, 0 100%);
+user-select: none;
+}
+.scroll-tab:hover { color: var(–parch); border-color: rgba(200,129,58,0.6); }
+.scroll-tab.active {
+background: rgba(200,129,58,0.15);
+color: var(–ember-glow);
+border-color: var(–ember);
+text-shadow: 0 0 8px rgba(240,168,85,0.5);
+}
+
+/* ── ACCORDION SCROLL ── */
+.accordion-item {
+background: rgba(15,8,4,0.9);
+border: 1px solid var(–border-rune);
+border-radius: 2px;
+margin-bottom: 6px;
+overflow: hidden;
+transition: border-color 0.2s;
+}
+.accordion-item.open { border-color: var(–border-rune-bright); }
+.accordion-header {
+display: flex;
+align-items: center;
+justify-content: space-between;
+padding: 10px 14px;
+cursor: pointer;
+transition: background 0.15s;
+user-select: none;
+}
+.accordion-header:hover { background: rgba(200,129,58,0.06); }
+.accordion-chevron {
+font-size: 0.5rem;
+color: var(–ember);
+transition: transform 0.2s;
+}
+.accordion-item.open .accordion-chevron { transform: rotate(180deg); }
+.accordion-body {
+border-top: 1px solid var(–border-rune);
+padding: 12px 14px;
+background: rgba(10,5,2,0.5);
+}
+
+/* ── SCROLL-STYLE INPUT ── */
+.scroll-input, .scroll-select, .scroll-textarea {
+width: 100%;
+background: rgba(242,232,197,0.1);
+border: 1px solid var(–border-rune);
+border-radius: 2px;
+padding: 8px 10px;
+color: var(–parch);
+font-family: ‘IM Fell English’, serif;
+font-size: 0.78rem;
+outline: none;
+transition: border-color 0.15s;
+}
+.scroll-input:focus, .scroll-select:focus, .scroll-textarea:focus {
+border-color: var(–ember-glow);
+box-shadow: 0 0 10px rgba(200,129,58,0.2);
+}
+.scroll-select { -webkit-appearance: none; }
+.scroll-textarea { resize: vertical; min-height: 60px; }
+.form-label {
+display: block;
+font-family: ‘Cinzel’, serif;
+font-size: 0.5rem;
+color: var(–ember);
+letter-spacing: 2px;
+text-transform: uppercase;
+margin-bottom: 5px;
+}
+
+/* ── RUNE BUTTONS ── */
+.rune-btn {
+display: inline-flex;
+align-items: center;
+justify-content: center;
+gap: 6px;
+padding: 8px 18px;
+background: linear-gradient(135deg, #3d1e08, #2a1404);
+border: 1px solid var(–ember);
+color: var(–ember-glow);
+font-family: ‘Cinzel’, serif;
+font-size: 0.6rem;
+letter-spacing: 1.5px;
+cursor: pointer;
+transition: all 0.15s;
+text-transform: uppercase;
+clip-path: polygon(6px 0, calc(100% - 6px) 0, 100% 6px, 100% calc(100% - 6px), calc(100% - 6px) 100%, 6px 100%, 0 calc(100% - 6px), 0 6px);
+position: relative;
+}
+.rune-btn:hover { background: linear-gradient(135deg, #5a2e10, #3d1e08); box-shadow: 0 0 15px rgba(200,129,58,0.3); }
+.rune-btn.sm { padding: 5px 12px; font-size: 0.52rem; }
+.rune-btn.full { width: 100%; }
+.rune-btn.danger { background: linear-gradient(135deg, #3d0808, #200404); border-color: #9b1b1b; color: #ef9a9a; }
+.rune-btn.danger:hover { background: linear-gradient(135deg, #5d0a0a, #3d0808); }
+.rune-btn.success { background: linear-gradient(135deg, #0a3d10, #042010); border-color: #2e7d32; color: #a5d6a7; }
+.rune-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* ── PLAYER CARD ── */
+.player-card {
+background: linear-gradient(135deg, rgba(15,8,4,0.97), rgba(26,14,8,0.9));
+border: 1px solid var(–border-rune);
+border-radius: 3px;
+padding: 14px;
+margin-bottom: 10px;
+transition: border-color 0.2s, box-shadow 0.2s;
+position: relative;
+}
+.player-card:hover { border-color: var(–border-rune-bright); box-shadow: 0 0 20px rgba(200,129,58,0.1); }
+.player-card.dead { opacity: 0.55; border-color: rgba(155,27,27,0.4); }
+.player-card.hof { border-color: rgba(201,162,39,0.6); box-shadow: 0 0 20px rgba(201,162,39,0.15); }
+
+/* ── HP BAR ── */
+.hp-track { height: 5px; background: rgba(255,255,255,0.06); border-radius: 3px; overflow: hidden; margin-top: 4px; }
+.hp-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+
+/* ── STAT GRID ── */
+.stat-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; margin-top: 8px; }
+.stat-cell { text-align: center; background: rgba(0,0,0,0.3); border-radius: 3px; padding: 5px 2px; border: 1px solid rgba(255,255,255,0.04); }
+.stat-label { font-family: ‘Cinzel’, serif; font-size: 0.4rem; letter-spacing: 1px; color: var(–parch-shadow); }
+.stat-val { font-family: ‘Cinzel’, serif; font-size: 0.75rem; font-weight: 700; margin-top: 1px; }
+
+/* ── TAG PILLS ── */
+.tag { display: inline-block; padding: 2px 8px; border-radius: 12px; font-size: 0.55rem; font-family: ‘Cinzel’, serif; letter-spacing: 0.5px; }
+.tag-curse { background: rgba(50,10,60,0.8); color: #e1bee7; border: 1px solid rgba(156,39,176,0.4); }
+.tag-wanted { background: rgba(60,10,10,0.8); color: #ffcdd2; border: 1px solid rgba(239,83,80,0.4); }
+.tag-exile { background: rgba(20,20,30,0.8); color: #bbb; border: 1px solid rgba(100,100,120,0.4); }
+.tag-servant { background: rgba(5,30,25,0.8); color: #b2dfdb; border: 1px solid rgba(77,182,172,0.4); }
+.tag-hof { background: rgba(40,30,5,0.8); color: #ffd54f; border: 1px solid rgba(201,162,39,0.5); }
+
+/* ── LOG ENTRY ── */
+.log-entry {
+display: flex; gap: 10px; padding: 8px 0;
+border-bottom: 1px solid rgba(200,129,58,0.08);
+}
+.log-icon { width: 22px; text-align: center; font-size: 0.8rem; flex-shrink: 0; }
+.log-time { font-family: ‘Cinzel’, serif; font-size: 0.48rem; color: var(–parch-shadow); width: 50px; text-align: right; flex-shrink: 0; padding-top: 2px; }
+.log-who { font-family: ‘Cinzel’, serif; font-size: 0.62rem; font-weight: 600; color: var(–ember-glow); }
+.log-what { font-family: ‘IM Fell English’, serif; font-size: 0.7rem; color: var(–parch); margin-top: 1px; }
+
+/* ── DICE SVG ── */
+@keyframes dice-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+.dice-spinning { animation: dice-spin 0.15s linear infinite; transform-origin: center; }
+
+/* ── MODAL OVERLAY ── */
+.modal-overlay {
+position: fixed; inset: 0;
+background: rgba(5,3,2,0.95);
+z-index: 1000;
+overflow-y: auto;
+padding: 20px;
+display: none;
+}
+.modal-overlay.open { display: flex; align-items: flex-start; justify-content: center; }
+.modal-box {
+background: linear-gradient(160deg, #1a0e08, #0f0804);
+border: 1px solid var(–ember);
+border-radius: 4px;
+padding: 24px;
+width: 100%;
+max-width: 560px;
+box-shadow: 0 0 50px rgba(200,129,58,0.2);
+margin: auto;
+position: relative;
+}
+.modal-box::before {
+content: ‘’;
+position: absolute;
+top: 0; left: 0; right: 0; height: 3px;
+background: linear-gradient(90deg, transparent, var(–ember), transparent);
+}
+
+/* ── MOBILE DRAWER NAV ── */
+.drawer-overlay {
+position: fixed; inset: 0;
+background: rgba(0,0,0,0.7);
+z-index: 500;
+display: none;
+}
+.drawer-overlay.open { display: block; }
+.drawer {
+position: fixed;
+left: 0; top: 0; bottom: 0;
+width: 240px;
+background: #0f0804;
+border-right: 2px solid var(–ember);
+z-index: 501;
+transform: translateX(-100%);
+transition: transform 0.25s;
+overflow-y: auto;
+}
+.drawer.open { transform: translateX(0); }
+
+/* ── RARITY BADGE ── */
+.rarity-badge { font-family: ‘Cinzel’, serif; font-size: 0.52rem; padding: 2px 8px; border-radius: 2px; letter-spacing: 1px; font-weight: 600; }
+
+/* ── INFO BAR ── */
+.info-bar {
+background: rgba(200,129,58,0.06);
+border: 1px solid var(–border-rune);
+border-radius: 3px;
+padding: 8px 12px;
+font-family: ‘IM Fell English’, serif;
+font-size: 0.7rem;
+color: var(–parch);
+line-height: 1.5;
+margin-bottom: 10px;
+}
+.info-bar.danger { border-color: rgba(155,27,27,0.4); background: rgba(155,27,27,0.06); }
+.info-bar.gold { border-color: rgba(201,162,39,0.5); background: rgba(201,162,39,0.08); }
+
+/* ── EMPTY STATE ── */
+.empty-state {
+text-align: center;
+padding: 40px 16px;
+font-family: ‘IM Fell English’, serif;
+font-style: italic;
+font-size: 0.85rem;
+color: var(–parch-shadow);
+opacity: 0.6;
+}
+
+/* ── FADE IN ── */
+@keyframes fadeIn { from { opacity:0; transform: translateY(6px); } to { opacity:1; transform: translateY(0); } }
+.fade-in { animation: fadeIn 0.25s ease forwards; }
+
+/* ── RESPONSIVE ── */
+@media (max-width: 768px) {
+.sidenav { display: none; }
+.topbar { display: flex; }
+.bottom-nav { display: flex; }
+.panel-area { padding: 12px; }
+.stat-grid { grid-template-columns: repeat(4, 1fr); }
+}
+@media (min-width: 769px) {
+.topbar { display: none; }
+.bottom-nav { display: none; }
+}
+
+/* ── 3D MAP CANVAS ── */
+.map-canvas-wrap {
+width: 100%;
+height: 420px;
+border: 1px solid var(–border-rune);
+border-radius: 4px;
+overflow: hidden;
+background: #020101;
+position: relative;
+}
+@media (max-width: 768px) { .map-canvas-wrap { height: 300px; } }
+
+/* ── PARCHMENT TEXT STYLES ── */
+.parch-title { font-family: ‘Cinzel Decorative’, serif; color: var(–ink); font-size: 1.1rem; margin-bottom: 4px; }
+.parch-body { font-family: ‘IM Fell English’, serif; color: var(–ink-faded); font-size: 0.78rem; line-height: 1.7; }
+.parch-label { font-family: ‘Cinzel’, serif; font-size: 0.52rem; color: var(–ink); letter-spacing: 2px; text-transform: uppercase; }
+
+/* ── PHASE BAR ── */
+.phase-bar { display: flex; gap: 3px; margin: 8px 0; }
+.phase-pip { flex: 1; height: 5px; border-radius: 3px; cursor: pointer; transition: all 0.2s; }
+
+/* ── ROLL BOX ── */
+.roll-box {
+background: rgba(8,4,2,0.95);
+border: 1px solid var(–border-rune);
+border-radius: 3px;
+padding: 14px;
+margin-top: 8px;
+}
+
+/* ── SCROLL PROGRESS (session timer) ── */
+.session-timer {
+font-family: ‘Cinzel’, serif;
+font-size: 1.6rem;
+color: var(–ember-glow);
+text-align: center;
+text-shadow: 0 0 20px rgba(200,129,58,0.5);
+letter-spacing: 4px;
+}
+`;
+
+/* ═══════════════════════════════════════════════════════════════════
+3D MAP SCENE
+═══════════════════════════════════════════════════════════════════ */
+
+const LOC_3D = {
+hq:      { pos: [0, 0, 0],       color: 0xffd54f, emissive: 0xffa000, size: 0.25 },
+forest:  { pos: [-3.2, 0, -2],   color: 0x2e7d32, emissive: 0x1b5e20, size: 0.2  },
+kingdom: { pos: [0.3, 0, -3],    color: 0xc62828, emissive: 0x7f0000, size: 0.2  },
+caverns: { pos: [-1.4, -0.5, 2], color: 0x6a1b9a, emissive: 0x4a148c, size: 0.2  },
+edge:    { pos: [2.8, 0, -0.5],  color: 0x9c27b0, emissive: 0x6a0080, size: 0.22 },
+library: { pos: [2.0, -0.3, 2.2],color: 0x1565c0, emissive: 0x0d47a1, size: 0.2  },
+};
+
+function TerrainPlane() {
+const meshRef = useRef();
+const geom = useMemo(() => {
+const g = new THREE.PlaneGeometry(10, 10, 40, 40);
+const pos = g.attributes.position;
+for (let i = 0; i < pos.count; i++) {
+const x = pos.getX(i), z = pos.getY(i);
+const h = (Math.sin(x * 0.8) * 0.25 + Math.cos(z * 0.6) * 0.2 + Math.sin((x + z) * 0.5) * 0.15) * 0.5;
+pos.setZ(i, h);
+}
+g.computeVertexNormals();
+return g;
+}, []);
+
+return (
+<mesh ref={meshRef} geometry={geom} rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.6, 0]}>
+<meshLambertMaterial color={0x1a0e04} wireframe={false} />
+</mesh>
+);
+}
+
+function GridLines() {
+const points = [];
+for (let i = -5; i <= 5; i++) {
+points.push(new THREE.Vector3(-5, -0.58, i), new THREE.Vector3(5, -0.58, i));
+points.push(new THREE.Vector3(i, -0.58, -5), new THREE.Vector3(i, -0.58, 5));
+}
+const geom = new THREE.BufferGeometry().setFromPoints(points);
+return <lineSegments geometry={geom}><lineBasicMaterial color={0x3d1e08} transparent opacity={0.4} /></lineSegments>;
+}
+
+function ConnectionLine({ fromPos, toPos }) {
+const points = [new THREE.Vector3(…fromPos), new THREE.Vector3(…toPos)];
+const geom = new THREE.BufferGeometry().setFromPoints(points);
+return <lineSegments geometry={geom}><lineBasicMaterial color={0xc8813a} transparent opacity={0.25} linewidth={1} /></lineSegments>;
+}
+
+function LocationNode({ locId, data, danger, selected, onSelect, hasPlayer }) {
+const meshRef = useRef();
+const glowRef = useRef();
+const [hovered, setHovered] = useState(false);
+const dangerColor = [0x66bb6a, 0x66bb6a, 0x81c784, 0xff9800, 0xef5350, 0xb71c1c][danger] || 0xffffff;
+
+useFrame((state) => {
+if (!meshRef.current) return;
+const t = state.clock.elapsedTime;
+meshRef.current.position.y = data.pos[1] + Math.sin(t * 1.2 + data.pos[0]) * 0.04;
+if (selected) meshRef.current.rotation.y = t * 0.8;
+if (glowRef.current) {
+glowRef.current.material.opacity = 0.15 + Math.sin(t * 2) * 0.07;
+glowRef.current.scale.setScalar(1 + Math.sin(t * 1.5) * 0.08);
+}
+});
+
+return (
+<group position={data.pos} onClick={() => onSelect(locId)} onPointerOver={() => setHovered(true)} onPointerOut={() => setHovered(false)}>
+{/* Glow sphere */}
+<mesh ref={glowRef}>
+<sphereGeometry args={[data.size * 2.5, 12, 12]} />
+<meshBasicMaterial color={data.color} transparent opacity={0.12} />
+</mesh>
+{/* Main node */}
+<mesh ref={meshRef}>
+<sphereGeometry args={[data.size * (hovered ? 1.2 : 1), 16, 16]} />
+<meshStandardMaterial color={data.color} emissive={data.emissive} emissiveIntensity={selected ? 0.8 : 0.4} roughness={0.3} metalness={0.6} />
+</mesh>
+{/* Danger ring */}
+<mesh rotation={[Math.PI / 2, 0, 0]} position={[0, -0.35, 0]}>
+<ringGeometry args={[data.size * 1.5, data.size * 1.8, 32]} />
+<meshBasicMaterial color={dangerColor} transparent opacity={0.5} side={THREE.DoubleSide} />
+</mesh>
+{/* Player indicator */}
+{hasPlayer && (
+<mesh position={[0, data.size + 0.15, 0]}>
+<sphereGeometry args={[0.06, 8, 8]} />
+<meshBasicMaterial color={0xffffff} />
+</mesh>
+)}
+{/* Label */}
+<Html distanceFactor={6} position={[0, data.size + 0.3, 0]} style={{ pointerEvents: “none” }}>
+<div style={{ fontFamily: “‘Cinzel’, serif”, fontSize: “7px”, color: hovered ? “#f0c040” : “#c8813a”, whiteSpace: “nowrap”, textShadow: “0 0 8px rgba(0,0,0,0.9)”, letterSpacing: “1px”, textTransform: “uppercase”, userSelect: “none” }}>
+{WORLD_LOCATIONS.find(l => l.id === locId)?.short || locId}
+</div>
+</Html>
+</group>
+);
+}
+
+function Map3DScene({ mapDanger, players, selectedLoc, onSelectLoc }) {
+const playersByLoc = {};
+players.filter(p => !p.isDead && p.location).forEach(p => { playersByLoc[p.location] = true; });
+
+return (
+<>
+<Stars radius={80} depth={50} count={2000} factor={3} saturation={0} fade speed={0.5} />
+<ambientLight intensity={0.08} />
+<pointLight position={[0, 3, 0]} intensity={0.8} color={0xf0a855} distance={12} />
+<pointLight position={[-3, 1, -2]} intensity={0.3} color={0x4fc3f7} />
+<pointLight position={[3, 1, 2]} intensity={0.3} color={0x9c27b0} />
+<TerrainPlane />
+<GridLines />
+{/* Connection lines */}
+{WORLD_LOCATIONS.map(loc => loc.connectedTo.map(toId => {
+const toLoc = WORLD_LOCATIONS.find(l => l.id === toId);
+if (!toLoc) return null;
+const fromD = LOC_3D[loc.id], toD = LOC_3D[toId];
+if (!fromD || !toD) return null;
+return <ConnectionLine key={`${loc.id}-${toId}`} fromPos={fromD.pos} toPos={toD.pos} />;
+}))}
+{/* Location nodes */}
+{WORLD_LOCATIONS.map(loc => {
+const d3 = LOC_3D[loc.id];
+if (!d3) return null;
+return (
+<LocationNode
+key={loc.id}
+locId={loc.id}
+data={d3}
+danger={mapDanger[loc.id] ?? loc.danger}
+selected={selectedLoc === loc.id}
+onSelect={onSelectLoc}
+hasPlayer={!!playersByLoc[loc.id]}
+/>
+);
+})}
+<OrbitControls enablePan={false} minDistance={4} maxDistance={14} maxPolarAngle={Math.PI / 2.2} autoRotate autoRotateSpeed={0.3} />
+</>
+);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+MAIN APP
+═══════════════════════════════════════════════════════════════════ */
+export default function HollowRealmGM() {
+// ── PERSISTED STATE ──
+const [players, setPlayers] = useState(() => S.get(“players”, []));
+const [sessionLog, setSessionLog] = useState(() => S.get(“session_log”, []));
+const [sessionActive, setSessionActive] = useState(() => S.get(“session_active”, false));
+const [sessionNumber, setSessionNumber] = useState(() => S.get(“session_number”, 1));
+const [mapPins, setMapPins] = useState(() => S.get(“map_pins”, []));
+const [mapDanger, setMapDanger] = useState(() => S.get(“map_danger”, {}));
+const [baseRooms, setBaseRooms] = useState(() => S.get(“base_rooms”, {vault:1,barracks:0,forge:0,infirmary:0,watchtower:0}));
+const [baseResidents, setBaseResidents] = useState(() => S.get(“base_residents”, []));
+const [villainsLive, setVillainsLive] = useState(() => S.get(“villains_live”, []));
+const [villainPhases, setVillainPhases] = useState(() => S.get(“villain_phases”, {}));
+const [villainEmpires, setVillainEmpires] = useState(() => S.get(“villain_empires”, {}));
+const [orphanedCompanions, setOrphanedCompanions] = useState(() => S.get(“orphaned”, []));
+const [dailyShop, setDailyShop] = useState(() => S.get(“daily_shop”, null));
+const [activeBounty, setActiveBounty] = useState(() => S.get(“active_bounty”, null));
+const [raidHistory, setRaidHistory] = useState(() => S.get(“raid_history”, []));
+
+// ── UI STATE ──
+const [tab, setTab] = useState(“players”);
+const [drawerOpen, setDrawerOpen] = useState(false);
+const [playerModalId, setPlayerModalId] = useState(null);
+const [addPlayerOpen, setAddPlayerOpen] = useState(false);
+
+// Sub-tab state per panel
+const [mapSelectedLoc, setMapSelectedLoc] = useState(null);
+const [mapSubTab, setMapSubTab] = useState(“terrain”);
+const [diceRoll, setDiceRoll] = useState(null);
+const [diceSpinning, setDiceSpinning] = useState(false);
+const [diceHistory, setDiceHistory] = useState([]);
+const [diceCtx, setDiceCtx] = useState({player:””,purpose:””,target:””,custom:””});
+const [classTab, setClassTab] = useState(“Warrior”);
+const [classSec, setClassSec] = useState(“overview”);
+const [rosterTab, setRosterTab] = useState(“living”);
+const [rulesTab, setRulesTab] = useState(“economy”);
+const [hqTab, setHqTab] = useState(“facilities”);
+const [villainTab, setVillainTab] = useState(null);
+const [villainSec, setVillainSec] = useState(“lore”);
+const [faqOpen, setFaqOpen] = useState(null);
+const [logFilter, setLogFilter] = useState(“all”);
+const [logSearch, setLogSearch] = useState(””);
+const [arsenalCls, setArsenalCls] = useState(“Warrior”);
+const [compendiumTab, setCompendiumTab] = useState(“races”);
+const [raceTab, setRaceTab] = useState(Object.keys(RACES)[0]);
+const [compTab, setCompTab] = useState(Object.keys(COMPANION_TYPES)[0]);
+const [npcTab, setNpcTab] = useState(“npcs”);
+const [shadowResult, setShadowResult] = useState(””);
+const [manualLog, setManualLog] = useState({who:””,what:””,type:“note”});
+const [battleTimer, setBattleTimer] = useState(180);
+const [battleRunning, setBattleRunning] = useState(false);
+const battleRef = useRef(null);
+const [bunkPlayer, setBunkPlayer] = useState(””);
+const [showAddResident, setShowAddResident] = useState(false);
+const [residentForm, setResidentForm] = useState({name:””,role:“guard”});
+const [addItemTarget, setAddItemTarget] = useState(null);
+const [addItemForm, setAddItemForm] = useState({name:””,type:“weapon”,rarity:“Common”,condition:“Pristine”,note:””});
+
+// ── PERSIST ──
+useEffect(() => { S.set(“players”, players); }, [players]);
+useEffect(() => { S.set(“session_log”, sessionLog); }, [sessionLog]);
+useEffect(() => { S.set(“session_active”, sessionActive); }, [sessionActive]);
+useEffect(() => { S.set(“session_number”, sessionNumber); }, [sessionNumber]);
+useEffect(() => { S.set(“map_pins”, mapPins); }, [mapPins]);
+useEffect(() => { S.set(“map_danger”, mapDanger); }, [mapDanger]);
+useEffect(() => { S.set(“base_rooms”, baseRooms); }, [baseRooms]);
+useEffect(() => { S.set(“base_residents”, baseResidents); }, [baseResidents]);
+useEffect(() => { S.set(“villains_live”, villainsLive); }, [villainsLive]);
+useEffect(() => { S.set(“villain_phases”, villainPhases); }, [villainPhases]);
+useEffect(() => { S.set(“villain_empires”, villainEmpires); }, [villainEmpires]);
+useEffect(() => { S.set(“orphaned”, orphanedCompanions); }, [orphanedCompanions]);
+useEffect(() => { S.set(“daily_shop”, dailyShop); }, [dailyShop]);
+useEffect(() => { S.set(“active_bounty”, activeBounty); }, [activeBounty]);
+useEffect(() => { S.set(“raid_history”, raidHistory); }, [raidHistory]);
+
+// ── LOG HELPER ──
+const addLog = useCallback((entry) => {
+const e = { id: Date.now() + Math.random(), time: new Date().toLocaleTimeString([],{hour:“2-digit”,minute:“2-digit”,second:“2-digit”}), session: sessionActive ? sessionNumber : “Prep”, …entry };
+setSessionLog(prev => [e, …prev].slice(0, 300));
+}, [sessionActive, sessionNumber]);
+
+// ── PLAYER HELPERS ──
+const updatePlayer = useCallback((id, updates) => {
+setPlayers(prev => prev.map(p => p.id === id ? {…p, …updates} : p));
+}, []);
+
+// ── DICE ──
+const rollDice = useCallback(() => {
+if (diceSpinning) return;
+setDiceSpinning(true);
+setTimeout(() => {
+const result = d20();
+setDiceRoll(result);
+setDiceSpinning(false);
+const purpose = diceCtx.custom || diceCtx.target || ROLL_PURPOSES[diceCtx.purpose]?.label || “General Action”;
+setDiceHistory(prev => [{result, player: diceCtx.player||“DM”, purpose, time: new Date().toLocaleTimeString([],{hour:“2-digit”,minute:“2-digit”})}, …prev].slice(0,15));
+if (sessionActive) addLog({type:“dice”, who: diceCtx.player||“DM”, what:`Rolled a d20 for ${purpose}`, result});
+}, 600);
+}, [diceSpinning, diceCtx, sessionActive, addLog]);
+
+const rollShadow = useCallback(() => {
+const r = d20();
+const pl = players.filter(p => !p.isDead);
+if (!pl.length) { setShadowResult(“No active players.”); return; }
+const target = pl[Math.floor(Math.random() * pl.length)];
+if (r >= 15) setShadowResult(`✓ ${target.charname} resists the Shadow (rolled ${r}).`);
+else setShadowResult(`⚠ ${target.charname}'s Shadow MANIFESTS! (rolled ${r}) — "${target.shadowTrait || "Unknown Shadow"}"`);
+}, [players]);
+
+// ── BATTLE TIMER ──
+useEffect(() => {
+if (battleRunning) {
+battleRef.current = setInterval(() => {
+setBattleTimer(t => { if (t <= 1) { setBattleRunning(false); clearInterval(battleRef.current); return 0; } return t - 1; });
+}, 1000);
+} else {
+clearInterval(battleRef.current);
+}
+return () => clearInterval(battleRef.current);
+}, [battleRunning]);
+
+// ── SESSION ──
+const beginSession = () => { setSessionActive(true); addLog({type:“session”,who:“System”,what:`Session ${sessionNumber} began.`}); };
+const endSession = () => {
+if (!window.confirm(“End current session?”)) return;
+addLog({type:“session”,who:“System”,what:`Session ${sessionNumber} ended.`});
+setSessionActive(false);
+setSessionNumber(n => n + 1);
+};
+
+// ── VILLAIN HELPERS ──
+const toggleVillain = (id) => {
+setVillainsLive(prev => prev.includes(id) ? prev.filter(x => x !== id) : […prev, id]);
+};
+const setVillainPhase = (id, phase) => setVillainPhases(prev => ({…prev, [id]: phase}));
+const adjEmpire = (id, type, delta) => {
+setVillainEmpires(prev => {
+const cur = prev[id] || {territory:100, lieutenants:3};
+return {…prev, [id]: {…cur, [type]: type === “territory” ? clamp(cur.territory + delta, 0, 100) : Math.max(0, cur.lieutenants + delta)}};
+});
+};
+
+/* ────────────────────────────────────────────────
+PLAYER CREATION FORM
+──────────────────────────────────────────────── */
+const [creation, setCreation] = useState({username:””,charname:””,cls:””,race:””,origin:””,payment:“tiktok”,notes:””,repRoll:null,traitRoll:null,weaponRoll:null,skillRoll:null,shadowRoll:null,enchantRoll:null,destinyRoll:null});
+const setC = (k, v) => setCreation(prev => ({…prev, [k]: v}));
+const rollC = (field) => setCreation(prev => ({…prev, [field]: d20()}));
+
+const submitPlayer = () => {
+const c = creation;
+if (!c.charname || !c.cls || !c.race) { alert(“Name, Class, and Race required.”); return; }
+const getTrait = (r) => TRAIT_TIERS.find(t => r >= t.range[0] && r <= t.range[1]);
+const newP = {
+id: Date.now(), joined: new Date().toLocaleDateString(),
+hp: CLASS_HP[c.cls], maxHp: CLASS_HP[c.cls],
+protectionBalance: 0, inventory: [], consequences: [], isDead: false, giftPowerUsed: false,
+advancement: {raids:0, battles:0},
+…c,
+traitLevel: c.traitRoll ? getTrait(c.traitRoll)?.level : “✓ Standard”
+};
+setPlayers(prev => [newP, …prev]);
+addLog({type:“note”, who:newP.charname, what:`Spawned. Class: ${c.cls}. Race: ${c.race}. Paid: ${c.payment === "paypal" ? "$13.00 CAD" : "1,000 Coins"}.`});
+setCreation({username:””,charname:””,cls:””,race:””,origin:””,payment:“tiktok”,notes:””,repRoll:null,traitRoll:null,weaponRoll:null,skillRoll:null,shadowRoll:null,enchantRoll:null,destinyRoll:null});
+setAddPlayerOpen(false);
+setTab(“players”);
+};
+
+/* ────────────────────────────────────────────────
+HP ADJUSTMENT
+──────────────────────────────────────────────── */
+const adjHp = (id, delta) => {
+setPlayers(prev => prev.map(p => {
+if (p.id !== id) return p;
+const hp = clamp((p.hp || 0) + delta, 0, p.maxHp);
+if (sessionActive) addLog({type:“hp”, who:p.charname, what:`HP ${delta > 0 ? "+" : ""}${delta} → ${hp}/${p.maxHp}`});
+return {…p, hp};
+}));
+};
+
+const markDead = (id) => {
+const p = players.find(x => x.id === id);
+if (!p || !window.confirm(`Mark ${p.charname} as permanently DEAD?`)) return;
+const cause = window.prompt(“Cause of Death?”) || “Claimed by the Void”;
+updatePlayer(id, {isDead:true, deathCause:cause, deathSession:sessionNumber});
+if (p.companion) setOrphanedCompanions(prev => […prev, {…p.companion, formerOwner:p.charname}]);
+addLog({type:“death”, who:p.charname, what:`PERMANENTLY DEAD. Cause: ${cause}`});
+};
+
+const toggleHoF = (id) => {
+const p = players.find(x => x.id === id);
+if (!p) return;
+updatePlayer(id, {isHoF: !p.isHoF});
+addLog({type:“gift”, who:p.charname, what:p.isHoF ? “Removed from Hall of Fame.” : “INDUCTED into Hall of Fame! +3 CHA forever.”});
+};
+
+const addConsequence = (id, type, label) => {
+const p = players.find(x => x.id === id);
+if (!p) return;
+const cons = […(p.consequences||[]), {type, label}];
+updatePlayer(id, {consequences: cons});
+addLog({type:“consequence”, who:p.charname, what:`Gained: ${label}`});
+};
+
+const rmConsequence = (id, idx) => {
+const p = players.find(x => x.id === id);
+if (!p) return;
+const label = p.consequences[idx]?.label;
+updatePlayer(id, {consequences: p.consequences.filter((_,i)=>i!==idx)});
+addLog({type:“consequence”, who:p.charname, what:`Cleared: ${label}`});
+};
+
+/* ────────────────────────────────────────────────
+INVENTORY
+──────────────────────────────────────────────── */
+const addItem = (id) => {
+if (!addItemForm.name.trim()) return;
+const p = players.find(x => x.id === id);
+if (!p) return;
+const item = {…addItemForm, name:addItemForm.name.trim()};
+updatePlayer(id, {inventory: […(p.inventory||[]), item]});
+addLog({type:“item”, who:p.charname, what:`Obtained: ${item.name}`});
+setAddItemForm({name:””,type:“weapon”,rarity:“Common”,condition:“Pristine”,note:””});
+setAddItemTarget(null);
+};
+
+const rmItem = (playerId, idx) => {
+const p = players.find(x => x.id === playerId);
+if (!p) return;
+const item = p.inventory[idx];
+updatePlayer(playerId, {inventory: p.inventory.filter((_,i)=>i!==idx)});
+addLog({type:“item”, who:p.charname, what:`Lost: ${item?.name||"item"}`});
+};
+
+const toggleEquip = (playerId, idx) => {
+const p = players.find(x => x.id === playerId);
+if (!p) return;
+const inv = p.inventory.map((item, i) => ({…item, equipped: i===idx ? !item.equipped : (item.type===p.inventory[idx].type ? false : item.equipped)}));
+updatePlayer(playerId, {inventory: inv});
+};
+
+/* ────────────────────────────────────────────────
+COMPANION
+──────────────────────────────────────────────── */
+const assignCompanion = (id, type) => {
+const cData = COMPANION_TYPES[type];
+updatePlayer(id, {companion:{type, hp:cData.hp, maxHp:cData.hp, status:“active”}});
+addLog({type:“gift”, who:players.find(p=>p.id===id)?.charname||”?”, what:`Bonded companion: ${cData.icon} ${type}`});
+};
+
+const adjCompHp = (id, delta) => {
+const p = players.find(x => x.id === id);
+if (!p?.companion) return;
+const hp = clamp(p.companion.hp + delta, 0, p.companion.maxHp);
+const status = hp <= 0 ? “fled” : “active”;
+updatePlayer(id, {companion:{…p.companion, hp, status}});
+if (hp <= 0) addLog({type:“hp”, who:p.charname, what:`Companion ${p.companion.type} fled to HQ at 0 HP.`});
+};
+
+/* ────────────────────────────────────────────────
+HQ
+──────────────────────────────────────────────── */
+const upgradeRoom = (room) => {
+const cur = baseRooms[room] || 0;
+const tiers = BASE_ROOMS[room]?.tiers;
+if (!tiers || cur >= tiers.length) return;
+const cost = tiers[cur]?.cost;
+if (!window.confirm(`Upgrade ${BASE_ROOMS[room].name} to Level ${cur+1}? Cost: ${cost?.toLocaleString() || 0} coins`)) return;
+setBaseRooms(prev => ({…prev, [room]: cur+1}));
+addLog({type:“gift”, who:“HQ”, what:`${BASE_ROOMS[room].name} upgraded to Level ${cur+1}.`});
+};
+
+const addResident = () => {
+if (!residentForm.name.trim()) return;
+setBaseResidents(prev => […prev, {…residentForm, id:Date.now()}]);
+setResidentForm({name:””,role:“guard”});
+setShowAddResident(false);
+};
+
+const rollDailyShop = () => {
+const pick = (arr) => arr[Math.floor(Math.random()*arr.length)];
+const shop = {bargain:{name:pick(LEDGER_POOLS.bargain),price:500},essential:{name:pick(LEDGER_POOLS.essential),price:2000},artifact:{name:pick(LEDGER_POOLS.artifact),price:8000},rolledAt:new Date().toLocaleDateString()};
+setDailyShop(shop);
+addLog({type:“gift”, who:“Ledger”, what:“Daily Ledger refreshed with new stock.”});
+};
+
+const rollBounty = () => {
+const b = WANTED_BOUNTIES[Math.floor(Math.random()*WANTED_BOUNTIES.length)];
+setActiveBounty({…b, time:new Date().toLocaleTimeString()});
+addLog({type:“note”, who:“Bounty Board”, what:`New Target: ${b.name} at ${b.location}.`});
+};
+
+/* ════════════════════════════════════════════════
+RENDER PANELS
+════════════════════════════════════════════════ */
+
+/* ── PLAYERS PANEL ── */
+const PlayersPanel = () => {
+const living = players.filter(p => !p.isDead);
+const dead = players.filter(p => p.isDead);
+const hof = living.filter(p => p.isHoF);
+const current = rosterTab === “living” ? living : rosterTab === “dead” ? dead : hof;
+
+```
+return (
+  <div className="fade-in">
+    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+      <div>
+        <div className="section-title" style={{marginBottom:2}}>⚔️ The Roster</div>
+        <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.52rem",color:"var(--parch-shadow)",letterSpacing:"1px"}}>
+          {living.length} Alive · {dead.length} Dead · Session {sessionNumber}
+        </div>
+      </div>
+      <button className="rune-btn" onClick={() => setAddPlayerOpen(true)}>+ Forge Character</button>
+    </div>
+
+    {/* Session control */}
+    <div className="dark-card glow" style={{marginBottom:16,display:"flex",alignItems:"center",justifyContent:"space-between",flexWrap:"wrap",gap:8}}>
+      <div style={{display:"flex",alignItems:"center",gap:10}}>
+        <div className={`session-dot${sessionActive?"":" off"}`}/>
+        <div>
+          <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.62rem",color:"var(--ember-glow)",letterSpacing:"1px"}}>
+            {sessionActive ? `SESSION ${sessionNumber} — LIVE` : "SESSION OFFLINE"}
+          </div>
+        </div>
+      </div>
+      <div style={{display:"flex",gap:8}}>
+        {!sessionActive
+          ? <button className="rune-btn success sm" onClick={beginSession}>▶ Begin Session</button>
+          : <button className="rune-btn danger sm" onClick={endSession}>■ End Session</button>
+        }
+      </div>
+    </div>
+
+    {/* Roster tabs */}
+    <div className="scroll-tabs" style={{marginBottom:12}}>
+      {[["living","Living"],["dead","Hall of the Fallen"],["hof","Hall of Fame"]].map(([k,l]) => (
+        <div key={k} className={`scroll-tab${rosterTab===k?" active":""}`} onClick={() => setRosterTab(k)}>{l}</div>
+      ))}
+    </div>
+
+    {current.length === 0 && <div className="empty-state">No characters in this roster.<br/><em>Forge one to begin.</em></div>}
+
+    {current.map(p => {
+      const stats = getPlayerStats(p);
+      const hpPct = Math.max(0, Math.min(100, ((p.hp||0)/(p.maxHp||1))*100));
+      const hpColor = hpPct > 60 ? "#4caf50" : hpPct > 30 ? "#ff9800" : "#ef5350";
+      const trait = TRAIT_TIERS.find(t => t.level === p.traitLevel);
+
+      return (
+        <div key={p.id} className={`player-card${p.isDead?" dead":""}${p.isHoF?" hof":""}`}>
+          {/* Header */}
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+            <div style={{flex:1}}>
+              <div style={{display:"flex",alignItems:"center",gap:8,flexWrap:"wrap"}}>
+                <span style={{fontFamily:"'Cinzel',serif",fontSize:"0.85rem",fontWeight:"700",color:p.isHoF?"var(--gold-bright)":"var(--ember-glow)",letterSpacing:"1px"}}>
+                  {CLASS_ICON_EMO[p.cls]} {p.charname}
+                </span>
+                {p.isHoF && <span className="tag tag-hof">HALL OF FAME</span>}
+                {p.isDead && <span className="tag tag-wanted">☠ DEAD</span>}
+                {p.consequences?.map((c,i) => <span key={i} className={`tag tag-${c.type}`}>{c.label}</span>)}
+              </div>
+              {p.username && <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.48rem",color:"var(--parch-shadow)",letterSpacing:"1px",marginTop:2}}>@{p.username} · {p.race||"?"} {p.cls}</div>}
+              {p.title && <div style={{fontFamily:"'IM Fell English',serif",fontStyle:"italic",fontSize:"0.65rem",color:"var(--void-glow)",marginTop:2}}>"{p.title}"</div>}
+              {trait && <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.5rem",color:trait.color,marginTop:4,letterSpacing:"0.5px"}}>Trait: {trait.level}</div>}
+            </div>
+            <div style={{textAlign:"right",flexShrink:0}}>
+              <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.55rem",color:"var(--parch-shadow)",marginBottom:2}}>HP</div>
+              <div style={{fontFamily:"'Cinzel Decorative',serif",fontSize:"1.1rem",color:hpColor,fontWeight:"900",lineHeight:1}}>
+                {p.hp || 0}<span style={{fontSize:"0.6rem",color:"var(--parch-shadow)"}}>/{p.maxHp||0}</span>
+              </div>
+              <div style={{display:"flex",gap:4,marginTop:6,justifyContent:"flex-end"}}>
+                <button className="rune-btn danger sm" onClick={() => adjHp(p.id,-1)}>−</button>
+                <button className="rune-btn success sm" onClick={() => adjHp(p.id,1)}>+</button>
+              </div>
+            </div>
+          </div>
+
+          {/* HP bar */}
+          <div className="hp-track">
+            <div className="hp-fill" style={{width:hpPct+"%",background:`linear-gradient(90deg,${hpColor}80,${hpColor})`}}/>
+          </div>
+
+          {/* Stats */}
+          <div className="stat-grid" style={{marginTop:10}}>
+            {Object.entries(stats).map(([s,v]) => (
+              <div key={s} className="stat-cell">
+                <div className="stat-label" style={{color:STAT_COLORS[s]}}>{s}</div>
+                <div className="stat-val" style={{color:STAT_COLORS[s]}}>{v}{s===PRIMARY_STAT[p.cls]?"★":""}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Companion */}
+          {p.companion && (
+            <div style={{marginTop:10,background:"rgba(0,0,0,0.3)",borderRadius:3,padding:"6px 10px",border:"1px solid rgba(138,90,220,0.2)",display:"flex",alignItems:"center",gap:10}}>
+              <span style={{fontSize:"1rem"}}>{COMPANION_TYPES[p.companion.type]?.icon}</span>
+              <div style={{flex:1}}>
+                <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.52rem",color:"var(--void-glow)",letterSpacing:"1px"}}>{p.companion.type}</div>
+                <div className="hp-track" style={{marginTop:3}}>
+                  <div className="hp-fill" style={{width:`${((p.companion.hp||0)/(p.companion.maxHp||1))*100}%`,background:"linear-gradient(90deg,#7c4dff80,#7c4dff)"}}/>
+                </div>
+              </div>
+              <span style={{fontFamily:"'Cinzel',serif",fontSize:"0.52rem",color:p.companion.status==="active"?"#4caf50":"#ef5350"}}>{p.companion.status==="active"?"Active":"Fled"}</span>
+              <div style={{display:"flex",gap:3}}>
+                <button className="rune-btn danger sm" style={{padding:"3px 7px"}} onClick={() => adjCompHp(p.id,-1)}>−</button>
+                <button className="rune-btn success sm" style={{padding:"3px 7px"}} onClick={() => adjCompHp(p.id,1)}>+</button>
+              </div>
+            </div>
+          )}
+
+          {/* Actions */}
+          <div style={{display:"flex",gap:6,marginTop:10,flexWrap:"wrap"}}>
+            <button className="rune-btn sm" onClick={() => setPlayerModalId(p.id)}>📋 Full Sheet</button>
+            <button className="rune-btn sm" onClick={() => setAddItemTarget(p.id)}>+ Item</button>
+            {!p.isHoF && !p.isDead && <button className="rune-btn sm" style={{borderColor:"var(--gold)",color:"var(--gold-bright)"}} onClick={() => toggleHoF(p.id)}>★ HoF</button>}
+            {p.isHoF && <button className="rune-btn sm" onClick={() => toggleHoF(p.id)}>Remove HoF</button>}
+            {!p.isDead && <button className="rune-btn danger sm" onClick={() => markDead(p.id)}>☠ Kill</button>}
+          </div>
+        </div>
+      );
+    })}
+  </div>
+);
+```
+
+};
+
+/* ── MAP PANEL ── */
+const MapPanel = () => {
+const sel = mapSelectedLoc ? WORLD_LOCATIONS.find(l => l.id === mapSelectedLoc) : null;
+return (
+<div className="fade-in">
+<div className="section-title">🗺️ The Hollow Realm — World Map</div>
+<div className="info-bar">Click a location node to view details. Drag to orbit · Scroll to zoom.</div>
+<div className="map-canvas-wrap">
+<Canvas camera={{position:[0,6,8],fov:50}}>
+<Suspense fallback={null}>
+<Map3DScene mapDanger={mapDanger} players={players} selectedLoc={mapSelectedLoc} onSelectLoc={setMapSelectedLoc} />
+</Suspense>
+</Canvas>
+</div>
+
+```
+    {/* Location detail */}
+    {sel && (
+      <div className="dark-card glow fade-in" style={{marginTop:14,borderColor:`${sel.color}60`}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:10}}>
+          <div>
+            <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.85rem",fontWeight:"700",color:sel.color,letterSpacing:"2px"}}>{sel.icon} {sel.name}</div>
+            <div style={{fontFamily:"'IM Fell English',serif",fontStyle:"italic",fontSize:"0.7rem",color:"var(--parch-shadow)",marginTop:3}}>{sel.desc}</div>
+          </div>
+          <div>
+            <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.55rem",color:DANGER_COLORS[mapDanger[sel.id]??sel.danger],border:`1px solid ${DANGER_COLORS[mapDanger[sel.id]??sel.danger]}`,padding:"3px 10px",borderRadius:12,letterSpacing:"1px"}}>
+              ⚠ {DANGER_LABELS[mapDanger[sel.id]??sel.danger]}
+            </div>
+            <div style={{display:"flex",gap:4,marginTop:6}}>
+              {[1,2,3,4,5].map(d => (
+                <button key={d} className="rune-btn sm" style={{padding:"3px 7px",borderColor:(mapDanger[sel.id]??sel.danger)===d?DANGER_COLORS[d]:"var(--border-rune)",color:(mapDanger[sel.id]??sel.danger)===d?DANGER_COLORS[d]:"var(--parch-shadow)"}} onClick={() => setMapDanger(prev=>({...prev,[sel.id]:d}))}>{d}</button>
+              ))}
+            </div>
+          </div>
+        </div>
+        <div className="rune-divider"><span>Features</span></div>
+        {sel.features.map((f,i) => <div key={i} style={{fontFamily:"'IM Fell English',serif",fontSize:"0.7rem",color:"var(--parch)",padding:"3px 0",borderBottom:"1px solid rgba(200,129,58,0.06)"}}>✦ {f}</div>)}
+        {sel.id === "hq" && (
+          <button className="rune-btn full" style={{marginTop:12}} onClick={() => setTab("hq")}>⚜ Enter Moon Squad HQ</button>
+        )}
+      </div>
+    )}
+
+    {/* Bounty board */}
+    <div className="dark-card" style={{marginTop:14}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+        <div className="section-title" style={{marginBottom:0}}>🏹 Bounty Board</div>
+        <div style={{display:"flex",gap:6}}>
+          <button className="rune-btn sm" onClick={rollBounty}>Roll Bounty</button>
+          {activeBounty && <button className="rune-btn danger sm" onClick={() => { addLog({type:"action",who:"Moon Squad",what:`Bounty claimed: ${activeBounty.name}`}); setActiveBounty(null); }}>Claim</button>}
+        </div>
+      </div>
+      {activeBounty
+        ? <div style={{background:"rgba(155,27,27,0.1)",border:"1px solid rgba(155,27,27,0.3)",borderRadius:3,padding:"10px 12px"}}>
+            <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.72rem",fontWeight:"700",color:"#ef9a9a",letterSpacing:"1px"}}>{activeBounty.name}</div>
+            <div style={{fontFamily:"'IM Fell English',serif",fontSize:"0.68rem",color:"var(--parch)",marginTop:4}}>{activeBounty.type} · {activeBounty.location}</div>
+            <div style={{display:"flex",gap:12,marginTop:6}}>
+              <span style={{fontFamily:"'Cinzel',serif",fontSize:"0.55rem",color:"var(--gold-bright)"}}>Reward: {activeBounty.reward}</span>
+              <span style={{fontFamily:"'Cinzel',serif",fontSize:"0.55rem",color:"#ef9a9a"}}>DC {activeBounty.dc}</span>
+            </div>
+          </div>
+        : <div className="empty-state" style={{padding:"16px"}}>No active bounty. Roll the board.</div>
+      }
+    </div>
+  </div>
+);
+```
+
+};
+
+/* ── DICE PANEL ── */
+const DicePanel = () => {
+const display = getDiceDisplay(diceRoll);
+const glow = diceSpinning ? “#b388ff” : display?.glow || “rgba(200,129,58,0.3)”;
+const fc = diceSpinning ? “#3d2b6b” : !diceRoll ? “#2a1f5e” : diceRoll===1?”#5d0a0a”:diceRoll<=4?”#4a1010”:diceRoll<=9?”#4a2a08”:diceRoll<=14?”#0a3d1a”:diceRoll<=19?”#0a2040”:”#2a0555”;
+
+```
+return (
+  <div className="fade-in">
+    <div className="section-title">🎲 The Oracle's Dice</div>
+    <div className="dark-card glow" style={{textAlign:"center",paddingTop:20,paddingBottom:20}}>
+      <svg viewBox="0 0 120 120" width={160} height={160} style={{display:"block",margin:"0 auto",filter:`drop-shadow(0 0 ${diceSpinning?12:display?18:8}px ${glow})`,animation:diceSpinning?"dice-spin 0.15s linear infinite":"none",transformOrigin:"60px 60px"}}>
+        <defs><radialGradient id="dg" cx="50%" cy="40%" r="60%"><stop offset="0%" stopColor={fc}/><stop offset="100%" stopColor="#050510"/></radialGradient></defs>
+        <circle cx="60" cy="60" r="56" fill="none" stroke={glow} strokeWidth="0.5" opacity="0.4"/>
+        <polygon points="60,8 106,37 91,88 29,88 14,37" fill="url(#dg)" stroke={glow} strokeWidth="1.2"/>
+        <polygon points="60,8 80,42 40,42" fill="none" stroke={`${glow}60`} strokeWidth="0.6"/>
+        <polygon points="14,37 40,42 29,88" fill="none" stroke={`${glow}40`} strokeWidth="0.6"/>
+        <polygon points="106,37 80,42 91,88" fill="none" stroke={`${glow}40`} strokeWidth="0.6"/>
+        <text x="60" y="65" textAnchor="middle" dominantBaseline="middle" fontSize={diceRoll>=10?22:28} fontWeight="bold" fill={diceSpinning?"#b388ff80":display?display.glow:"#4a3f7a"} fontFamily="Georgia,serif" style={{userSelect:"none"}}>
+          {diceSpinning?"?":diceRoll||"d20"}
+        </text>
+      </svg>
+
+      {display && !diceSpinning && (
+        <div className="fade-in" style={{margin:"12px 0",padding:"14px 20px",background:display.bg,border:`1px solid ${display.glow}`,borderRadius:4,boxShadow:`0 0 30px ${display.glow}40`}}>
+          <div style={{fontFamily:"'Cinzel Decorative',serif",fontSize:"1.2rem",fontWeight:"bold",color:"#fff",letterSpacing:"2px"}}>{display.label}</div>
+          <div style={{fontFamily:"'IM Fell English',serif",fontSize:"0.74rem",color:"rgba(255,255,255,0.7)",marginTop:4}}>{display.desc}</div>
+          {diceCtx.player && <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.55rem",color:"rgba(255,255,255,0.4)",marginTop:4,letterSpacing:"1px"}}>{diceCtx.player} · {diceCtx.custom||diceCtx.target||ROLL_PURPOSES[diceCtx.purpose]?.label||""}</div>}
+        </div>
+      )}
+
+      <button className="rune-btn" style={{fontSize:"0.85rem",padding:"12px 36px",letterSpacing:"2px",marginTop:8,opacity:diceSpinning?0.5:1}} onClick={rollDice} disabled={diceSpinning}>
+        {diceSpinning?"ROLLING...":"ROLL THE DICE"}
+      </button>
+    </div>
+
+    {/* Shadow trigger */}
+    <div className="dark-card" style={{borderColor:"rgba(155,27,27,0.4)",marginBottom:12}}>
+      <div style={{display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+        <div className="section-title" style={{marginBottom:0,color:"#ef9a9a"}}>🌑 Shadow Trigger</div>
+        <button className="rune-btn danger sm" onClick={rollShadow}>Test Shadow</button>
+      </div>
+      {shadowResult && <div style={{marginTop:8,fontFamily:"'IM Fell English',serif",fontSize:"0.75rem",color:"var(--parch)",fontStyle:"italic"}}>{shadowResult}</div>}
+      {!shadowResult && <div style={{marginTop:6,fontFamily:"'Cinzel',serif",fontSize:"0.52rem",color:"var(--parch-shadow)"}}>Roll to see if a player's Shadow Trait manifests (DC 15+ to resist)</div>}
+    </div>
+
+    {/* Context */}
+    <div className="dark-card">
+      <div className="section-title">Roll Context</div>
+      <div style={{marginBottom:10}}>
+        <label className="form-label">For which player?</label>
+        <select className="scroll-select" value={diceCtx.player} onChange={e => setDiceCtx(prev=>({...prev,player:e.target.value}))}>
+          <option value="">DM / General Roll</option>
+          {players.filter(p=>!p.isDead).map(p=><option key={p.id} value={p.charname}>{CLASS_ICON_EMO[p.cls]} {p.charname} ({p.cls})</option>)}
+        </select>
+      </div>
+      <div style={{marginBottom:10}}>
+        <label className="form-label">Category</label>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(3,1fr)",gap:4}}>
+          {Object.entries(ROLL_PURPOSES).map(([k,cat])=>(
+            <button key={k} className={`rune-btn sm${diceCtx.purpose===k?" ":""}`} style={{fontSize:"0.5rem",padding:"5px 4px",background:diceCtx.purpose===k?`${cat.color}20`:"rgba(15,8,4,0.8)",color:diceCtx.purpose===k?cat.color:"var(--parch-shadow)",borderColor:diceCtx.purpose===k?cat.color:"var(--border-rune)",clipPath:"none"}} onClick={()=>setDiceCtx(prev=>({...prev,purpose:k,target:"",custom:""}))}>
+              {cat.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      {diceCtx.purpose && diceCtx.purpose!=="custom" && (
+        <div style={{marginBottom:10}}>
+          <label className="form-label">Specific Action</label>
+          <select className="scroll-select" value={diceCtx.target} onChange={e=>setDiceCtx(prev=>({...prev,target:e.target.value,custom:""}))}>
+            <option value="">— Select —</option>
+            {(ROLL_PURPOSES[diceCtx.purpose]?.options||[]).map(o=><option key={o} value={o}>{o}</option>)}
+            <option value="custom">Custom…</option>
+          </select>
+        </div>
+      )}
+      {(diceCtx.purpose==="custom"||diceCtx.target==="custom") && (
+        <div>
+          <label className="form-label">Describe</label>
+          <input className="scroll-input" placeholder="What is this roll for…" value={diceCtx.custom} onChange={e=>setDiceCtx(prev=>({...prev,custom:e.target.value}))} />
+        </div>
+      )}
+    </div>
+
+    {/* Roll reference */}
+    <div className="dark-card">
+      <div className="section-title">Roll Reference</div>
+      {[{r:"1",l:"💀 FUMBLE",c:"#ef5350",d:"Catastrophic backfire"},{r:"2–4",l:"✗ FAIL",c:"#ef5350",d:"Fails entirely"},{r:"5–9",l:"⚠ WEAK HIT",c:"#ff9800",d:"Partial success"},{r:"10–14",l:"✓ SUCCESS",c:"#66bb6a",d:"Clean success"},{r:"15–19",l:"★ STRONG HIT",c:"#4fc3f7",d:"Success + bonus"},{r:"20",l:"⚡ CRITICAL",c:"#ce93d8",d:"Legendary — announce it"}].map(({r,l,c,d})=>(
+        <div key={r} style={{display:"flex",alignItems:"center",gap:10,padding:"6px 0",borderBottom:"1px solid rgba(200,129,58,0.06)"}}>
+          <span style={{fontFamily:"'Cinzel',serif",fontSize:"0.62rem",color:c,fontWeight:"700",minWidth:40}}>{r}</span>
+          <span style={{fontFamily:"'Cinzel',serif",fontSize:"0.62rem",color:c,fontWeight:"700",minWidth:110}}>{l}</span>
+          <span style={{fontFamily:"'IM Fell English',serif",fontSize:"0.68rem",color:"var(--parch-shadow)"}}>{d}</span>
+        </div>
+      ))}
+    </div>
+
+    {/* Dice history */}
+    {diceHistory.length > 0 && (
+      <div className="dark-card">
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+          <div className="section-title" style={{marginBottom:0}}>Recent Rolls</div>
+          <button className="rune-btn sm" onClick={()=>setDiceHistory([])}>Clear</button>
+        </div>
+        {diceHistory.slice(0,10).map((e,i)=>{const dd=getDiceDisplay(e.result);return(
+          <div key={i} style={{display:"flex",gap:10,alignItems:"center",padding:"5px 0",borderBottom:"1px solid rgba(200,129,58,0.06)"}}>
+            <span style={{fontFamily:"'Cinzel',serif",fontSize:"0.7rem",fontWeight:"700",color:dd?.glow||"#aaa",minWidth:28,textAlign:"center"}}>{e.result}</span>
+            <span style={{fontFamily:"'Cinzel',serif",fontSize:"0.58rem",color:"var(--ember)",minWidth:80,letterSpacing:"0.5px"}}>{e.player}</span>
+            <span style={{fontFamily:"'IM Fell English',serif",fontSize:"0.65rem",color:"var(--parch-shadow)",flex:1}}>{e.purpose}</span>
+            <span style={{fontFamily:"'Cinzel',serif",fontSize:"0.48rem",color:"var(--parch-shadow)"}}>{e.time}</span>
+          </div>
+        );})}
+      </div>
+    )}
+  </div>
+);
+```
+
+};
+
+/* ── LOG PANEL ── */
+const LogPanel = () => {
+const filtered = sessionLog.filter(e => {
+const matchFilter = logFilter === “all” || e.type === logFilter;
+const matchSearch = !logSearch || (e.who+e.what).toLowerCase().includes(logSearch.toLowerCase());
+return matchFilter && matchSearch;
+});
+
+```
+return (
+  <div className="fade-in">
+    <div className="section-title">📋 Session Log</div>
+    <div style={{display:"flex",gap:8,marginBottom:12,flexWrap:"wrap"}}>
+      <input className="scroll-input" placeholder="Search log…" value={logSearch} onChange={e=>setLogSearch(e.target.value)} style={{flex:1,minWidth:140}} />
+      <select className="scroll-select" value={logFilter} onChange={e=>setLogFilter(e.target.value)} style={{width:120}}>
+        <option value="all">All Types</option>
+        {Object.entries(LOG_TYPES).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
+      </select>
+      <button className="rune-btn sm" onClick={() => { if(window.confirm("Clear log?")) setSessionLog([]); }}>Clear</button>
+    </div>
+    <div className="dark-card">
+      <div className="section-title">Manual Entry</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+        <div>
+          <label className="form-label">Who</label>
+          <input className="scroll-input" value={manualLog.who} onChange={e=>setManualLog(prev=>({...prev,who:e.target.value}))} placeholder="Player or NPC name" />
+        </div>
+        <div>
+          <label className="form-label">Type</label>
+          <select className="scroll-select" value={manualLog.type} onChange={e=>setManualLog(prev=>({...prev,type:e.target.value}))}>
+            {Object.entries(LOG_TYPES).map(([k,v])=><option key={k} value={k}>{v.icon} {v.label}</option>)}
+          </select>
+        </div>
+      </div>
+      <label className="form-label">What happened</label>
+      <textarea className="scroll-textarea" value={manualLog.what} onChange={e=>setManualLog(prev=>({...prev,what:e.target.value}))} placeholder="Describe the event…" style={{marginBottom:8}} />
+      <button className="rune-btn sm full" onClick={() => { if(!manualLog.who||!manualLog.what) return; addLog({type:manualLog.type,who:manualLog.who,what:manualLog.what}); setManualLog({who:"",what:"",type:"note"}); }}>+ Add to Log</button>
+    </div>
+    {filtered.length === 0 && <div className="empty-state">No entries match your filters.</div>}
+    <div className="dark-card" style={{padding:"8px 12px"}}>
+      {filtered.map(e => {
+        const lt = LOG_TYPES[e.type] || LOG_TYPES.note;
+        return (
+          <div key={e.id} className="log-entry">
+            <div className="log-icon">{lt.icon}</div>
+            <div style={{flex:1}}>
+              <div style={{display:"flex",alignItems:"center",gap:8}}>
+                <span className="log-who" style={{color:lt.color}}>{e.who}</span>
+                {e.result && <span style={{fontFamily:"'Cinzel Decorative',serif",fontSize:"0.7rem",color:getDiceDisplay(e.result)?.glow||"#aaa",fontWeight:"900"}}>{e.result}</span>}
+              </div>
+              <div className="log-what">{e.what}</div>
+            </div>
+            <div style={{display:"flex",flexDirection:"column",alignItems:"flex-end",flexShrink:0}}>
+              <div className="log-time">{e.time}</div>
+              <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.42rem",color:"var(--parch-shadow)",marginTop:2,letterSpacing:"0.5px"}}>S{e.session}</div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  </div>
+);
+```
+
+};
+
+/* ── COMBAT / BATTLE PANEL ── */
+const CombatPanel = () => {
+const mm = Math.floor(battleTimer/60), ss = battleTimer%60;
+return (
+<div className="fade-in">
+<div className="section-title">⚔️ Box Battle Arena</div>
+<div className="dark-card glow">
+<div className="session-timer">{String(mm).padStart(2,“0”)}:{String(ss).padStart(2,“0”)}</div>
+<div className="rune-divider"><span>Battle Timer</span></div>
+<div style={{display:“flex”,gap:8,justifyContent:“center”,flexWrap:“wrap”}}>
+<button className=“rune-btn” onClick={()=>setBattleRunning(r=>!r)}>{battleRunning?“⏸ Pause”:“▶ Start”}</button>
+<button className=“rune-btn danger sm” onClick={()=>{setBattleRunning(false);setBattleTimer(180);}}>↺ Reset</button>
+{[60,90,120,180,300].map(s=><button key={s} className=“rune-btn sm” onClick={()=>{setBattleRunning(false);setBattleTimer(s);}}>{Math.floor(s/60)}:{String(s%60).padStart(2,“0”)}</button>)}
+</div>
+</div>
+<div className="dark-card">
+<div className="section-title">Consequence Ladder</div>
+{[{range:”< 5k gap”,label:“MINOR”,color:”#66bb6a”,effects:[“Lose title”,“Stat debuff”]},{range:“5k–9.9k gap”,label:“MODERATE”,color:”#ff9800”,effects:[“Cursed 2 sessions”,“Item stolen”]},{range:“10k–19.9k gap”,label:“MAJOR”,color:”#ef5350”,effects:[“Exile”,“Servant status”]},{range:“20k–44.9k gap”,label:“SEVERE”,color:”#b71c1c”,effects:[“Death”,“Curse + exile + theft”]}].map(row=>(
+<div key={row.label} style={{display:“flex”,alignItems:“flex-start”,gap:12,padding:“8px 0”,borderBottom:“1px solid rgba(200,129,58,0.08)”}}>
+<div style={{minWidth:100}}>
+<div style={{fontFamily:”‘Cinzel’,serif”,fontSize:“0.6rem”,fontWeight:“700”,color:row.color,letterSpacing:“1px”}}>{row.label}</div>
+<div style={{fontFamily:”‘Cinzel’,serif”,fontSize:“0.48rem”,color:“var(–parch-shadow)”,letterSpacing:“0.5px”}}>{row.range}</div>
+</div>
+<div style={{flex:1}}>
+{row.effects.map((e,i)=><div key={i} style={{fontFamily:”‘IM Fell English’,serif”,fontSize:“0.68rem”,color:“var(–parch)”}}>• {e}</div>)}
+</div>
+<div style={{display:“flex”,gap:4,flexWrap:“wrap”}}>
+{row.effects.map((eff,i)=>(
+<div key={i} style={{display:“flex”,gap:3,alignItems:“center”}}>
+<select className=“scroll-select” id={`cons-player-${row.label}-${i}`} style={{width:100,fontSize:“0.55rem”,padding:“3px 6px”}}>
+<option value="">Player</option>
+{players.filter(p=>!p.isDead).map(p=><option key={p.id} value={p.id}>{p.charname}</option>)}
+</select>
+<button className=“rune-btn sm” style={{fontSize:“0.48rem”,padding:“3px 7px”}} onClick={()=>{
+const sel=document.getElementById(`cons-player-${row.label}-${i}`);
+if(!sel?.value) return;
+const type=eff.toLowerCase().includes(“curse”)?“curse”:eff.toLowerCase().includes(“exile”)?“exile”:eff.toLowerCase().includes(“servant”)?“servant”:“wanted”;
+addConsequence(Number(sel.value),type,eff);
+}}>Apply</button>
+</div>
+))}
+</div>
+</div>
+))}
+</div>
+</div>
+);
+};
+
+/* ── VILLAINS PANEL ── */
+const VillainsPanel = () => {
+const active = VILLAIN_LORE.filter(v => villainsLive.includes(v.id));
+const inactive = VILLAIN_LORE.filter(v => !villainsLive.includes(v.id));
+const buildCard = (v, isActive) => {
+const phaseIdx = villainPhases[v.id] ?? 0;
+const phase = v.phases[phaseIdx];
+const emp = villainEmpires[v.id] || {territory:100, lieutenants:3};
+return (
+<div key={v.id} className=“dark-card” style={{borderColor:`${v.color}${isActive?"80":"30"}`,opacity:isActive?1:0.7}}>
+<div style={{display:“flex”,justifyContent:“space-between”,alignItems:“center”}}>
+<div style={{display:“flex”,gap:10,alignItems:“center”}}>
+<span style={{fontSize:“1.5rem”,filter:isActive?””:“grayscale(1)”}}>{v.icon}</span>
+<div>
+<div style={{fontFamily:”‘Cinzel’,serif”,fontSize:“0.78rem”,fontWeight:“700”,color:isActive?”#fff”:“var(–parch-shadow)”,letterSpacing:“1px”}}>{v.name}</div>
+<div style={{fontFamily:”‘IM Fell English’,serif”,fontStyle:“italic”,fontSize:“0.6rem”,color:v.color}}>{v.title}</div>
+</div>
+</div>
+<button className={`rune-btn sm${isActive?" danger":""}`} onClick={()=>toggleVillain(v.id)}>{isActive?“Retire”:“Activate”}</button>
+</div>
+{isActive && phase && (
+<>
+<div className="rune-divider"><span>Current Phase</span></div>
+<div style={{background:`${phase.color}12`,border:`1px solid ${phase.color}40`,borderRadius:3,padding:“10px 12px”,marginBottom:10}}>
+<div style={{display:“flex”,justifyContent:“space-between”,alignItems:“center”,marginBottom:4}}>
+<div style={{fontFamily:”‘Cinzel’,serif”,fontSize:“0.62rem”,color:phase.color,letterSpacing:“1px”,fontWeight:“700”}}>{phase.name}</div>
+<div style={{fontFamily:”‘Cinzel’,serif”,fontSize:“0.55rem”,color:“var(–parch-shadow)”}}>{phase.hp}</div>
+</div>
+<div style={{fontFamily:”‘IM Fell English’,serif”,fontSize:“0.68rem”,color:“var(–parch)”}}>{phase.desc}</div>
+</div>
+<div className="phase-bar" style={{marginBottom:10}}>
+{v.phases.map((ph,i)=><div key={i} className=“phase-pip” style={{background:i<=phaseIdx?ph.color:“rgba(255,255,255,0.08)”}} onClick={()=>setVillainPhase(v.id,i)} />)}
+</div>
+<div style={{display:“grid”,gridTemplateColumns:“1fr 1fr”,gap:8,marginBottom:10}}>
+<div>
+<div style={{fontFamily:”‘Cinzel’,serif”,fontSize:“0.5rem”,color:“var(–ember)”,marginBottom:3,letterSpacing:“1px”}}>TERRITORY</div>
+<div style={{fontFamily:”‘Cinzel Decorative’,serif”,fontSize:“1rem”,fontWeight:“700”,color:emp.territory>50?”#ef5350”:“var(–gold-bright)”}}>{emp.territory}%</div>
+<div style={{display:“flex”,gap:4,marginTop:4}}>
+<button className=“rune-btn success sm” style={{flex:1,padding:“3px 5px”,fontSize:“0.48rem”}} onClick={()=>adjEmpire(v.id,“territory”,-10)}>-10%</button>
+<button className=“rune-btn danger sm” style={{flex:1,padding:“3px 5px”,fontSize:“0.48rem”}} onClick={()=>adjEmpire(v.id,“territory”,10)}>+10%</button>
+</div>
+</div>
+<div>
+<div style={{fontFamily:”‘Cinzel’,serif”,fontSize:“0.5rem”,color:“var(–ember)”,marginBottom:3,letterSpacing:“1px”}}>LIEUTENANTS</div>
+<div style={{fontFamily:”‘Cinzel Decorative’,serif”,fontSize:“1rem”,fontWeight:“700”,color:emp.lieutenants>0?”#ef5350”:“var(–parch-shadow)”}}>{emp.lieutenants}</div>
+<button className=“rune-btn danger sm full” style={{marginTop:4,padding:“3px 5px”,fontSize:“0.48rem”}} onClick={()=>adjEmpire(v.id,“lieutenants”,-1)}>Lt. Killed</button>
+</div>
+</div>
+</>
+)}
+{/* Accordion sub-sections */}
+{[[“lore”,“📜 Lore”],[“strengths”,“⚔️ Strengths”],[“phases”,“🔴 Phases”],[“loot”,“💎 Loot”]].map(([sec,label]) => (
+<div key={sec} className={`accordion-item${villainTab===v.id&&villainSec===sec?" open":""}`} style={{marginBottom:4}}>
+<div className=“accordion-header” onClick={()=>{setVillainTab(v.id);setVillainSec(villainTab===v.id&&villainSec===sec?null:sec);}}>
+<span style={{fontFamily:”‘Cinzel’,serif”,fontSize:“0.55rem”,color:“var(–ember-glow)”,letterSpacing:“1px”}}>{label}</span>
+<span className="accordion-chevron">▼</span>
+</div>
+{villainTab===v.id&&villainSec===sec && (
+<div className="accordion-body fade-in">
+{sec===“lore” && <><div style={{fontFamily:”‘IM Fell English’,serif”,fontStyle:“italic”,fontSize:“0.7rem”,color:“var(–gold-bright)”,borderLeft:“2px solid var(–gold)”,paddingLeft:8,marginBottom:8}}>”{v.motivation}”</div><div style={{fontFamily:”‘IM Fell English’,serif”,fontSize:“0.7rem”,color:“var(–parch)”,lineHeight:1.6}}>{v.lore}</div></>}
+{sec===“strengths” && <><div style={{marginBottom:8}}>{(v.strengths||[]).map((s,i)=><div key={i} style={{fontFamily:”‘IM Fell English’,serif”,fontSize:“0.7rem”,color:”#a5d6a7”,marginBottom:3}}>✦ {s}</div>)}</div><div style={{fontFamily:”‘Cinzel’,serif”,fontSize:“0.52rem”,color:”#ef9a9a”,letterSpacing:“1px”,marginBottom:4}}>WEAKNESSES</div>{(v.weaknesses||[]).map((w,i)=><div key={i} style={{fontFamily:”‘IM Fell English’,serif”,fontSize:“0.7rem”,color:”#ef9a9a”,marginBottom:3}}>✗ {w}</div>)}</>}
+{sec===“phases” && (v.phases||[]).map((ph,i)=><div key={i} style={{background:`${ph.color}12`,border:`1px solid ${ph.color}40`,borderRadius:3,padding:“8px 10px”,marginBottom:6}}><div style={{display:“flex”,justifyContent:“space-between”,fontFamily:”‘Cinzel’,serif”,fontSize:“0.6rem”,color:ph.color,marginBottom:3}}><span>P{ph.phase}: {ph.name}</span><span>{ph.hp}</span></div><div style={{fontFamily:”‘IM Fell English’,serif”,fontSize:“0.65rem”,color:“var(–parch)”}}>{ph.desc}</div></div>)}
+{sec===“loot” && (v.loot||[]).map((l,i)=><div key={i} style={{display:“flex”,justifyContent:“space-between”,padding:“5px 0”,borderBottom:“1px solid rgba(200,129,58,0.06)”,fontFamily:”‘IM Fell English’,serif”,fontSize:“0.68rem”}}><span style={{color:“var(–parch)”}}>{l.item}</span><span style={{color:“var(–gold-bright)”,flexShrink:0,marginLeft:8}}>{l.chance}</span></div>)}
+</div>
+)}
+</div>
+))}
+</div>
+);
+};
+
+```
+return (
+  <div className="fade-in">
+    <div className="section-title">🔴 Villain Tracker</div>
+    {active.length === 0 && <div className="info-bar">No active villains. Activate a villain from the Bestiary below.</div>}
+    {active.map(v => buildCard(v, true))}
+    <div className="rune-divider"><span>Bestiary — Inactive</span></div>
+    {inactive.map(v => buildCard(v, false))}
+  </div>
+);
+```
+
+};
+
+/* ── HQ PANEL ── */
+const HQPanel = () => (
+<div className="fade-in">
+<div className="section-title">🏠 Moon Squad HQ</div>
+<div className="scroll-tabs" style={{marginBottom:14}}>
+{[[“facilities”,“Facilities”],[“ledger”,“The Ledger”],[“bunkhouse”,“Bunkhouse”]].map(([k,l])=>(
+<div key={k} className={`scroll-tab${hqTab===k?" active":""}`} onClick={()=>setHqTab(k)}>{l}</div>
+))}
+</div>
+
+```
+  {hqTab==="facilities" && (
+    <div className="fade-in">
+      <div className="dark-card" style={{marginBottom:12}}>
+        <div className="section-title">🛡️ Base Defense</div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          {Object.entries(BASE_ROOMS).map(([key,room])=>{
+            const lv = baseRooms[key]||0;
+            const maxLv = room.tiers.length;
+            const nextTier = room.tiers[lv];
+            return (
+              <div key={key} style={{background:"rgba(10,5,2,0.8)",border:"1px solid var(--border-rune)",borderRadius:3,padding:"10px 12px",flex:"1 1 140px"}}>
+                <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.62rem",color:"var(--ember-glow)",marginBottom:3}}>{room.icon} {room.name}</div>
+                <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.5rem",color:"var(--parch-shadow)",marginBottom:6}}>Level {lv}/{maxLv}</div>
+                <div style={{fontFamily:"'IM Fell English',serif",fontSize:"0.65rem",color:"var(--parch)",marginBottom:8}}>{lv>0?room.tiers[lv-1].bonus:room.desc}</div>
+                {nextTier
+                  ? <button className="rune-btn sm full" onClick={()=>upgradeRoom(key)}>Upgrade ({nextTier.cost.toLocaleString()}c)</button>
+                  : <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.52rem",color:"var(--gold-bright)",textAlign:"center",border:"1px solid var(--gold)",padding:"4px",borderRadius:2}}>MAXED</div>
+                }
+              </div>
+            );
+          })}
+        </div>
+      </div>
+      <div className="dark-card">
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:10}}>
+          <div className="section-title" style={{marginBottom:0}}>👥 HQ Residents</div>
+          <button className="rune-btn sm" onClick={()=>setShowAddResident(r=>!r)}>+ Hire</button>
+        </div>
+        {showAddResident && (
+          <div className="fade-in" style={{background:"rgba(0,0,0,0.3)",border:"1px solid var(--border-rune)",borderRadius:3,padding:12,marginBottom:10}}>
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+              <div><label className="form-label">Name</label><input className="scroll-input" value={residentForm.name} onChange={e=>setResidentForm(r=>({...r,name:e.target.value}))} placeholder="NPC name" /></div>
+              <div><label className="form-label">Role</label><select className="scroll-select" value={residentForm.role} onChange={e=>setResidentForm(r=>({...r,role:e.target.value}))}>{Object.entries(RESIDENT_ROLES).map(([k,r])=><option key={k} value={k}>{r.icon} {r.label}</option>)}</select></div>
+            </div>
+            <button className="rune-btn success sm full" onClick={addResident}>Hire Resident</button>
+          </div>
+        )}
+        {baseResidents.length===0 ? <div className="empty-state" style={{padding:16}}>No residents hired yet.</div> : baseResidents.map((r,i)=>{
+          const role=RESIDENT_ROLES[r.role]||RESIDENT_ROLES.guard;
+          return <div key={r.id||i} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"7px 0",borderBottom:"1px solid rgba(200,129,58,0.06)"}}>
+            <span style={{fontFamily:"'Cinzel',serif",fontSize:"0.6rem",color:"#fff"}}>{role.icon} <b>{r.name}</b> <span style={{color:"var(--parch-shadow)"}}>({role.label})</span></span>
+            <span style={{fontFamily:"'Cinzel',serif",fontSize:"0.52rem",color:"var(--void-glow)"}}>{role.bonus}</span>
+            <button className="rune-btn danger sm" style={{padding:"2px 6px"}} onClick={()=>setBaseResidents(prev=>prev.filter((_,j)=>j!==i))}>✕</button>
+          </div>;
+        })}
+      </div>
+    </div>
+  )}
+
+  {hqTab==="ledger" && (
+    <div className="fade-in">
+      <div className="dark-card glow">
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:12}}>
+          <div className="section-title" style={{marginBottom:0,color:"var(--gold-bright)"}}>📦 The Daily Ledger</div>
+          <button className="rune-btn sm" onClick={rollDailyShop}>🎲 Roll Stock</button>
+        </div>
+        {!dailyShop
+          ? <div className="empty-state" style={{padding:20}}>Ledger is empty. Roll to generate today's stock.</div>
+          : <>
+              <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.48rem",color:"var(--parch-shadow)",marginBottom:10,letterSpacing:"1px"}}>CURRENT STOCK — {dailyShop.rolledAt}</div>
+              {["bargain","essential","artifact"].map(tier=>{
+                const item=dailyShop[tier];
+                const colors={bargain:"var(--parch-shadow)",essential:"var(--void-glow)",artifact:"var(--gold-bright)"};
+                return <div key={tier} style={{background:"rgba(0,0,0,0.3)",border:`1px solid ${colors[tier]}30`,borderRadius:3,padding:"10px 12px",marginBottom:8,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+                  <div>
+                    <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.48rem",color:colors[tier],letterSpacing:"2px",textTransform:"uppercase",marginBottom:3}}>{tier}</div>
+                    <div style={{fontFamily:"'IM Fell English',serif",fontSize:"0.78rem",color:"#fff",fontWeight:"bold"}}>{item.name}</div>
+                  </div>
+                  <div style={{textAlign:"right"}}>
+                    <div style={{fontFamily:"'Cinzel Decorative',serif",fontSize:"0.85rem",color:"var(--gold-bright)"}}>{item.price.toLocaleString()}c</div>
+                    <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.48rem",color:"var(--parch-shadow)"}}>${(item.price*0.013).toFixed(2)} PayPal</div>
+                  </div>
+                </div>;
+              })}
+            </>
+        }
+      </div>
+    </div>
+  )}
+
+  {hqTab==="bunkhouse" && (
+    <div className="fade-in">
+      <div className="dark-card" style={{marginBottom:12}}>
+        <label className="form-label">Select Player</label>
+        <select className="scroll-select" value={bunkPlayer} onChange={e=>setBunkPlayer(e.target.value)}>
+          <option value="">— Select Player —</option>
+          {players.filter(p=>!p.isDead).map(p=><option key={p.id} value={p.id}>{p.charname}</option>)}
+        </select>
+      </div>
+      {bunkPlayer && (() => {
+        const p = players.find(x=>x.id==bunkPlayer);
+        if (!p) return null;
+        const quarters = p.quarters||{bunk:0,lockbox:0,hearth:0};
+        return Object.entries(PERSONAL_QUARTERS).map(([key,q])=>{
+          const lv=quarters[key]||0;
+          const next=q.tiers[lv];
+          return <div key={key} className="dark-card glow" style={{marginBottom:12}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+              <div>
+                <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.72rem",color:"var(--ember-glow)"}}>{q.icon} {q.name}</div>
+                <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.52rem",color:"var(--parch-shadow)",marginTop:2}}>Level {lv}</div>
+              </div>
+              {next
+                ? <button className="rune-btn success sm" onClick={()=>{if(!window.confirm(`Spend ${next.cost}c to upgrade ${p.charname}'s ${q.name}?`))return;updatePlayer(p.id,{quarters:{...quarters,[key]:lv+1}});addLog({type:"gift",who:p.charname,what:`Upgraded ${q.name} to Level ${lv+1}.`});}}>Upgrade ({next.cost.toLocaleString()}c)</button>
+                : <span style={{fontFamily:"'Cinzel',serif",fontSize:"0.52rem",color:"var(--gold-bright)",border:"1px solid var(--gold)",padding:"3px 8px"}}>MAXED</span>
+              }
+            </div>
+            {q.tiers.map((tier,i)=><div key={i} style={{display:"flex",gap:8,alignItems:"center",padding:"5px 0",borderBottom:"1px solid rgba(200,129,58,0.06)",fontFamily:"'IM Fell English',serif",fontSize:"0.65rem"}}>
+              <span style={{color:lv>=i+1?"#4caf50":"rgba(255,255,255,0.15)",fontSize:"0.7rem"}}>{lv>=i+1?"✓":"○"}</span>
+              <span style={{color:"var(--parch-shadow)",minWidth:50}}>Lv.{i+1} ({tier.cost.toLocaleString()}c)</span>
+              <span style={{color:"var(--parch)",flex:1}}>{tier.bonus}</span>
+            </div>)}
+          </div>;
+        });
+      })()}
+    </div>
+  )}
+</div>
+```
+
+);
+
+/* ── COMPENDIUM PANEL ── */
+const CompendiumPanel = () => (
+<div className="fade-in">
+<div className="section-title">📖 The Compendium</div>
+<div className="scroll-tabs" style={{marginBottom:14}}>
+{[[“races”,“Races”],[“companions”,“Companions”],[“classes”,“Classes”],[“rules”,“Rules & FAQ”]].map(([k,l])=>(
+<div key={k} className={`scroll-tab${compendiumTab===k?" active":""}`} onClick={()=>setCompendiumTab(k)}>{l}</div>
+))}
+</div>
+
+```
+  {compendiumTab==="races" && (
+    <div className="fade-in">
+      <div className="scroll-tabs" style={{marginBottom:14}}>
+        {Object.keys(RACES).map(r=><div key={r} className={`scroll-tab${raceTab===r?" active":""}`} onClick={()=>setRaceTab(r)}>{RACES[r].icon} {r}</div>)}
+      </div>
+      {(() => {
+        const race=RACES[raceTab];
+        return <div className="dark-card glow fade-in">
+          <div style={{fontFamily:"'Cinzel Decorative',serif",fontSize:"1rem",color:"var(--ember-glow)",marginBottom:3}}>{race.icon} {raceTab}</div>
+          <div style={{fontFamily:"'IM Fell English',serif",fontStyle:"italic",fontSize:"0.72rem",color:"var(--parch-shadow)",marginBottom:12,lineHeight:1.6}}>{race.lore}</div>
+          <div className="rune-divider"><span>Stat Modifiers</span></div>
+          <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4,marginBottom:12}}>
+            {Object.entries(race.stats).map(([s,v])=><div key={s} style={{textAlign:"center",background:"rgba(0,0,0,0.3)",borderRadius:3,padding:"5px 2px",border:`1px solid ${v!==0?STAT_COLORS[s]+"40":"rgba(255,255,255,0.04)"}`}}>
+              <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.4rem",color:STAT_COLORS[s]}}>{s}</div>
+              <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.75rem",fontWeight:"700",color:v>0?"#4caf50":v<0?"#ef5350":"var(--parch-shadow)"}}>{v>0?"+":""}{v}</div>
+            </div>)}
+          </div>
+          <div className="rune-divider"><span>Racial Ability</span></div>
+          <div className="info-bar gold">{race.ability}</div>
+          <div className="rune-divider"><span>Biological Quirk</span></div>
+          <div style={{fontFamily:"'IM Fell English',serif",fontSize:"0.7rem",color:"var(--parch)",lineHeight:1.6}}>{race.biological_quirk}</div>
+        </div>;
+      })()}
+    </div>
+  )}
+
+  {compendiumTab==="companions" && (
+    <div className="fade-in">
+      <div className="scroll-tabs" style={{marginBottom:14}}>
+        {Object.keys(COMPANION_TYPES).map(c=><div key={c} className={`scroll-tab${compTab===c?" active":""}`} onClick={()=>setCompTab(c)}>{COMPANION_TYPES[c].icon} {c}</div>)}
+      </div>
+      {(() => {
+        const c=COMPANION_TYPES[compTab];
+        return <div className="dark-card glow fade-in">
+          <div style={{fontFamily:"'Cinzel Decorative',serif",fontSize:"1rem",color:"var(--ember-glow)",marginBottom:3}}>{c.icon} {compTab}</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+            <div style={{background:"rgba(0,0,0,0.3)",border:"1px solid rgba(77,182,172,0.3)",borderRadius:3,padding:"8px 10px"}}>
+              <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.5rem",color:"#4fc3f7",letterSpacing:"1px",marginBottom:3}}>ACTIVE ABILITY</div>
+              <div style={{fontFamily:"'IM Fell English',serif",fontSize:"0.68rem",color:"var(--parch)"}}>{c.active_ability}</div>
+            </div>
+            <div style={{background:"rgba(0,0,0,0.3)",border:"1px solid rgba(102,187,106,0.3)",borderRadius:3,padding:"8px 10px"}}>
+              <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.5rem",color:"#66bb6a",letterSpacing:"1px",marginBottom:3}}>PASSIVE TRAIT</div>
+              <div style={{fontFamily:"'IM Fell English',serif",fontSize:"0.68rem",color:"var(--parch)"}}>{c.passive_trait}</div>
+            </div>
+          </div>
+          <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.5rem",color:"var(--ember)",marginBottom:3,letterSpacing:"1px"}}>MAINTENANCE</div>
+          <div style={{fontFamily:"'IM Fell English',serif",fontSize:"0.68rem",color:"var(--parch)",marginBottom:8}}>{c.maintenance}</div>
+          <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.5rem",color:"var(--void-glow)",marginBottom:3,letterSpacing:"1px"}}>BEHAVIOUR QUIRK</div>
+          <div style={{fontFamily:"'IM Fell English',serif",fontStyle:"italic",fontSize:"0.68rem",color:"var(--parch-shadow)"}}>{c.behavior_quirk}</div>
+          <div className="rune-divider"><span>Assign to Player</span></div>
+          {players.filter(p=>!p.isDead).map(p=><button key={p.id} className="rune-btn sm" style={{marginRight:6,marginBottom:6}} onClick={()=>assignCompanion(p.id,compTab)}>{CLASS_ICON_EMO[p.cls]} {p.charname}</button>)}
+        </div>;
+      })()}
+    </div>
+  )}
+
+  {compendiumTab==="classes" && (
+    <div className="fade-in">
+      <div className="scroll-tabs" style={{marginBottom:14}}>
+        {CLASSES.map(c=><div key={c} className={`scroll-tab${classTab===c?" active":""}`} onClick={()=>{setClassTab(c);setClassSec("overview");}}>{CLASS_ICON_EMO[c]} {c}</div>)}
+      </div>
+      {(() => {
+        const lore=CLASS_LORE[classTab];
+        const stats=CLASS_BASE_STATS[classTab];
+        const primary=PRIMARY_STAT[classTab];
+        return <div className="dark-card glow fade-in">
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+            <div>
+              <div style={{fontFamily:"'Cinzel Decorative',serif",fontSize:"0.9rem",color:"var(--ember-glow)"}}>{CLASS_ICON_EMO[classTab]} {classTab.toUpperCase()}</div>
+              <div style={{fontFamily:"'IM Fell English',serif",fontStyle:"italic",fontSize:"0.65rem",color:"var(--parch-shadow)",marginTop:3}}>"{lore.tagline}"</div>
+            </div>
+            <div style={{textAlign:"right"}}>
+              <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.48rem",color:"var(--parch-shadow)",letterSpacing:"1px"}}>BASE HP</div>
+              <div style={{fontFamily:"'Cinzel Decorative',serif",fontSize:"1.2rem",fontWeight:"900",color:"#4caf50"}}>{CLASS_HP[classTab]}</div>
+            </div>
+          </div>
+          <div className="scroll-tabs" style={{marginBottom:10}}>
+            {[["overview","Overview"],["mechanics","Stats"],["gift","Gift Power"],["lore","Lore"]].map(([k,l])=><div key={k} className={`scroll-tab${classSec===k?" active":""}`} onClick={()=>setClassSec(k)}>{l}</div>)}
+          </div>
+          {classSec==="overview" && <div className="fade-in"><div style={{fontFamily:"'IM Fell English',serif",fontSize:"0.72rem",color:"var(--parch)",lineHeight:1.7,marginBottom:10}}>{lore.overview}</div><div style={{fontFamily:"'IM Fell English',serif",fontStyle:"italic",fontSize:"0.68rem",color:"var(--void-glow)"}}>Best for: "{lore.playstyle}"</div></div>}
+          {classSec==="mechanics" && <div className="fade-in">
+            <div style={{display:"grid",gridTemplateColumns:"repeat(7,1fr)",gap:4,marginBottom:14}}>
+              {Object.entries(stats).map(([s,v])=><div key={s} style={{textAlign:"center",background:"rgba(0,0,0,0.3)",borderRadius:3,padding:"6px 2px",border:`1px solid ${s===primary?STAT_COLORS[s]+"60":"rgba(255,255,255,0.04)"}`}}>
+                <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.42rem",color:STAT_COLORS[s]}}>{s}{s===primary?"★":""}</div>
+                <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.8rem",fontWeight:"700",color:STAT_COLORS[s]}}>{v}</div>
+              </div>)}
+            </div>
+            {(lore.strengths||[]).map((s,i)=><div key={i} style={{fontFamily:"'IM Fell English',serif",fontSize:"0.68rem",color:"#a5d6a7",marginBottom:3}}>✓ {s}</div>)}
+            <div style={{height:8}}/>
+            {(lore.weaknesses||[]).map((w,i)=><div key={i} style={{fontFamily:"'IM Fell English',serif",fontSize:"0.68rem",color:"#ef9a9a",marginBottom:3}}>✗ {w}</div>)}
+          </div>}
+          {classSec==="gift" && <div className="fade-in" style={{background:"rgba(102,187,106,0.08)",border:"1px solid rgba(102,187,106,0.3)",borderRadius:3,padding:16,textAlign:"center"}}>
+            <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.52rem",color:"#66bb6a",letterSpacing:"3px",marginBottom:6}}>UNIQUE GIFT POWER</div>
+            <div style={{fontFamily:"'Cinzel Decorative',serif",fontSize:"0.95rem",color:"#fff",marginBottom:8}}>{lore.giftPower.split("—")[0]}</div>
+            {lore.giftPower.split("—")[1] && <div style={{fontFamily:"'IM Fell English',serif",fontSize:"0.7rem",color:"#ccc",lineHeight:1.5}}>{lore.giftPower.split("—")[1]}</div>}
+          </div>}
+          {classSec==="lore" && <div className="fade-in" style={{fontFamily:"'IM Fell English',serif",fontStyle:"italic",fontSize:"0.75rem",color:"var(--parch-shadow)",lineHeight:1.8}}>"{lore.lore}"</div>}
+        </div>;
+      })()}
+    </div>
+  )}
+
+  {compendiumTab==="rules" && (
+    <div className="fade-in">
+      <div className="scroll-tabs" style={{marginBottom:14}}>
+        {RULES_SECTIONS.map(s=><div key={s.id} className={`scroll-tab${rulesTab===s.id?" active":""}`} onClick={()=>setRulesTab(s.id)}>{s.title.split(" ").slice(0,2).join(" ")}</div>)}
+        <div className={`scroll-tab${rulesTab==="faq"?" active":""}`} onClick={()=>setRulesTab("faq")}>FAQ</div>
+      </div>
+      {rulesTab==="faq"
+        ? <div className="dark-card fade-in">
+            <div className="section-title">Frequently Asked Questions</div>
+            {FAQ.map((f,i)=>(
+              <div key={i} className={`accordion-item${faqOpen===i?" open":""}`} style={{marginBottom:6}}>
+                <div className="accordion-header" onClick={()=>setFaqOpen(faqOpen===i?null:i)}>
+                  <span style={{fontFamily:"'Cinzel',serif",fontSize:"0.6rem",color:"var(--void-glow)",letterSpacing:"0.5px"}}>Q: {f.q}</span>
+                  <span className="accordion-chevron">▼</span>
+                </div>
+                {faqOpen===i && <div className="accordion-body fade-in"><div style={{fontFamily:"'IM Fell English',serif",fontSize:"0.72rem",color:"var(--parch)",lineHeight:1.6}}>{f.a}</div></div>}
+              </div>
+            ))}
+          </div>
+        : RULES_SECTIONS.filter(s=>s.id===rulesTab).map(s=>(
+            <div key={s.id} className="dark-card fade-in">
+              <div className="section-title">{s.title}</div>
+              <div style={{fontFamily:"'IM Fell English',serif",fontSize:"0.72rem",color:"var(--parch)",whiteSpace:"pre-wrap",lineHeight:1.7}}>{s.content}</div>
+            </div>
+          ))
+      }
+    </div>
+  )}
+</div>
+```
+
+);
+
+/* ── ADD PLAYER MODAL ── */
+const AddPlayerModal = () => {
+if (!addPlayerOpen) return null;
+const c = creation;
+const previewStats = c.cls && c.race ? getPlayerStats({cls:c.cls,race:c.race,traitLevel:c.traitRoll?TRAIT_TIERS.find(t=>c.traitRoll>=t.range[0]&&c.traitRoll<=t.range[1])?.level:“✓ Standard”}) : null;
+return (
+<div className=“modal-overlay open” onClick={e=>{if(e.target===e.currentTarget)setAddPlayerOpen(false);}}>
+<div className="modal-box">
+<div style={{display:“flex”,justifyContent:“space-between”,alignItems:“center”,marginBottom:20}}>
+<div style={{fontFamily:”‘Cinzel Decorative’,serif”,fontSize:“0.95rem”,color:“var(–ember-glow)”,letterSpacing:“2px”}}>⚔️ Forge a Character</div>
+<button className=“rune-btn danger sm” onClick={()=>setAddPlayerOpen(false)}>✕ Close</button>
+</div>
+<div style={{display:“grid”,gridTemplateColumns:“1fr 1fr”,gap:10}}>
+<div><label className="form-label">TikTok Username</label><input className=“scroll-input” value={c.username} onChange={e=>setC(“username”,e.target.value)} placeholder=”@handle” /></div>
+<div><label className="form-label">Character Name *</label><input className=“scroll-input” value={c.charname} onChange={e=>setC(“charname”,e.target.value)} placeholder=“Name” /></div>
+<div><label className="form-label">Class *</label><select className=“scroll-select” value={c.cls} onChange={e=>setC(“cls”,e.target.value)}><option value="">— Class —</option>{CLASSES.map(cl=><option key={cl} value={cl}>{CLASS_ICON_EMO[cl]} {cl}</option>)}</select></div>
+<div><label className="form-label">Race *</label><select className=“scroll-select” value={c.race} onChange={e=>setC(“race”,e.target.value)}><option value="">— Race —</option>{Object.keys(RACES).map(r=><option key={r} value={r}>{RACES[r].icon} {r}</option>)}</select></div>
+<div><label className="form-label">Origin</label><select className=“scroll-select” value={c.origin} onChange={e=>setC(“origin”,e.target.value)}><option value="">— Origin —</option>{ORIGINS.map(o=><option key={o} value={o}>{o}</option>)}</select></div>
+<div><label className="form-label">Payment</label><select className=“scroll-select” value={c.payment} onChange={e=>setC(“payment”,e.target.value)}><option value="tiktok">TikTok (1,000 Coins)</option><option value="paypal">PayPal ($13.00 CAD)</option></select></div>
+</div>
+{previewStats && (
+<div style={{marginTop:12,background:“rgba(0,0,0,0.3)”,border:“1px solid var(–border-rune)”,borderRadius:3,padding:“10px 12px”}}>
+<div style={{fontFamily:”‘Cinzel’,serif”,fontSize:“0.5rem”,color:“var(–ember)”,letterSpacing:“2px”,marginBottom:6}}>PROJECTED STATS</div>
+<div className="stat-grid">
+{Object.entries(previewStats).map(([s,v])=><div key={s} className="stat-cell"><div className="stat-label" style={{color:STAT_COLORS[s]}}>{s}</div><div className="stat-val" style={{color:STAT_COLORS[s]}}>{v}</div></div>)}
+</div>
+</div>
+)}
+<div className="rune-divider"><span>Optional Rolls</span></div>
+<div style={{display:“grid”,gridTemplateColumns:“1fr 1fr”,gap:8}}>
+{[[“repRoll”,“Reputation”,“d20”],[“traitRoll”,“Trait Tier”,“d20”],[“skillRoll”,“Signature Skill”,“d20”],[“shadowRoll”,“Shadow Trait”,“d20”],[“enchantRoll”,“Enchantment”,“d20”],[“destinyRoll”,“Destiny Thread”,“d20”]].map(([field,label])=>(
+<div key={field} style={{display:“flex”,alignItems:“center”,gap:6}}>
+<div style={{flex:1}}>
+<div style={{fontFamily:”‘Cinzel’,serif”,fontSize:“0.48rem”,color:“var(–ember)”,letterSpacing:“1px”,marginBottom:3}}>{label}</div>
+<div style={{fontFamily:”‘Cinzel’,serif”,fontSize:“0.65rem”,color:c[field]?“var(–ember-glow)”:“var(–parch-shadow)”}}>{c[field]||”—”}</div>
+</div>
+<button className=“rune-btn sm” onClick={()=>rollC(field)}>🎲</button>
+</div>
+))}
+</div>
+<div style={{marginTop:12}}><label className="form-label">Notes</label><textarea className=“scroll-textarea” value={c.notes} onChange={e=>setC(“notes”,e.target.value)} placeholder=“Additional notes…”/></div>
+<button className=“rune-btn full” style={{marginTop:16,fontSize:“0.75rem”,letterSpacing:“2px”}} onClick={submitPlayer}>⚔️ SPAWN CHARACTER</button>
+</div>
+</div>
+);
+};
+
+/* ── PLAYER DETAIL MODAL ── */
+const PlayerModal = () => {
+const p = players.find(x => x.id === playerModalId);
+if (!p || !playerModalId) return null;
+const stats = getPlayerStats(p);
+return (
+<div className=“modal-overlay open” onClick={e=>{if(e.target===e.currentTarget)setPlayerModalId(null);}}>
+<div className="modal-box" style={{maxWidth:620}}>
+<div style={{display:“flex”,justifyContent:“space-between”,alignItems:“center”,marginBottom:16}}>
+<div style={{fontFamily:”‘Cinzel Decorative’,serif”,fontSize:“0.9rem”,color:“var(–ember-glow)”}}>{CLASS_ICON_EMO[p.cls]} {p.charname}</div>
+<button className=“rune-btn danger sm” onClick={()=>setPlayerModalId(null)}>✕</button>
+</div>
+<div style={{display:“grid”,gridTemplateColumns:“1fr 1fr”,gap:8,marginBottom:14}}>
+{[[“Race”,p.race||”—”],[“Class”,p.cls],[“Origin”,p.origin||”—”],[“Joined”,p.joined||”—”],[“Trait”,p.traitLevel||”—”],[“Title”,p.title||”—”]].map(([k,v])=>(
+<div key={k} style={{background:“rgba(0,0,0,0.3)”,borderRadius:3,padding:“6px 10px”}}>
+<div style={{fontFamily:”‘Cinzel’,serif”,fontSize:“0.48rem”,color:“var(–ember)”,letterSpacing:“1px”}}>{k}</div>
+<div style={{fontFamily:”‘IM Fell English’,serif”,fontSize:“0.72rem”,color:“var(–parch)”}}>{v}</div>
+</div>
+))}
+</div>
+<div className="stat-grid" style={{marginBottom:14}}>
+{Object.entries(stats).map(([s,v])=><div key={s} className="stat-cell"><div className="stat-label" style={{color:STAT_COLORS[s]}}>{s}</div><div className="stat-val" style={{color:STAT_COLORS[s]}}>{v}{s===PRIMARY_STAT[p.cls]?“★”:””}</div></div>)}
+</div>
+{p.signatureSkill && <div className="info-bar gold" style={{marginBottom:8}}><b>Signature Skill:</b> {p.signatureSkill} — {p.signatureSkillDesc}</div>}
+{p.shadowTrait && <div className="info-bar danger" style={{marginBottom:8}}><b>Shadow Trait:</b> {p.shadowTrait} — {p.shadowTraitDesc}</div>}
+{p.destinyThread && <div className=“info-bar” style={{marginBottom:8,borderColor:“rgba(156,39,176,0.4)”,background:“rgba(156,39,176,0.06)”}}><b>Destiny Thread:</b> {p.destinyThread}</div>}
+{p.repPassive && <div className="info-bar" style={{marginBottom:8}}><b>Reputation Passive:</b> {p.repPassive}</div>}
+{p.notes && <div style={{fontFamily:”‘IM Fell English’,serif”,fontStyle:“italic”,fontSize:“0.7rem”,color:“var(–parch-shadow)”,marginBottom:12}}>{p.notes}</div>}
+<div className="rune-divider"><span>Inventory</span></div>
+{(!p.inventory||p.inventory.length===0) && <div className="empty-state" style={{padding:12}}>No items.</div>}
+{(p.inventory||[]).map((item,i)=>(
+<div key={i} style={{display:“flex”,alignItems:“center”,gap:8,padding:“6px 0”,borderBottom:“1px solid rgba(200,129,58,0.06)”}}>
+<span style={{fontFamily:”‘IM Fell English’,serif”,fontSize:“0.72rem”,color:item.equipped?“var(–ember-glow)”:“var(–parch)”,flex:1}}>{item.name}</span>
+{item.rarity && <span className=“rarity-badge” style={{color:RARITY_COLOR[item.rarity]||”#aaa”,border:`1px solid ${RARITY_COLOR[item.rarity]||"#aaa"}30`}}>{item.rarity}</span>}
+{item.condition && <span style={{fontFamily:”‘Cinzel’,serif”,fontSize:“0.48rem”,color:“var(–parch-shadow)”}}>{item.condition}</span>}
+<button className=“rune-btn sm” style={{padding:“2px 6px”,fontSize:“0.48rem”}} onClick={()=>toggleEquip(p.id,i)}>{item.equipped?“⚡Eq”:“Equip”}</button>
+<button className=“rune-btn danger sm” style={{padding:“2px 6px”}} onClick={()=>rmItem(p.id,i)}>✕</button>
+</div>
+))}
+<div className="rune-divider"><span>Add Item</span></div>
+<div style={{display:“grid”,gridTemplateColumns:“2fr 1fr 1fr”,gap:6,marginBottom:8}}>
+<input className=“scroll-input” placeholder=“Item name” value={addItemForm.name} onChange={e=>setAddItemForm(f=>({…f,name:e.target.value}))} onKeyDown={e=>{if(e.key===“Enter”)addItem(p.id);}} />
+<select className=“scroll-select” value={addItemForm.rarity} onChange={e=>setAddItemForm(f=>({…f,rarity:e.target.value}))}>
+{Object.keys(RARITY_COLOR).map(r=><option key={r} value={r}>{r}</option>)}
+</select>
+<select className=“scroll-select” value={addItemForm.condition} onChange={e=>setAddItemForm(f=>({…f,condition:e.target.value}))}>
+{[“Pristine”,“Worn”,“Damaged”,“Broken”].map(c=><option key={c} value={c}>{c}</option>)}
+</select>
+</div>
+<button className=“rune-btn sm full” onClick={()=>addItem(p.id)}>+ Add Item</button>
+<div className="rune-divider"><span>Consequences</span></div>
+<div style={{display:“flex”,gap:6,flexWrap:“wrap”,marginBottom:10}}>
+{[[“curse”,“Cursed”,“tag-curse”],[“wanted”,“Wanted”,“tag-wanted”],[“exile”,“Exiled”,“tag-exile”],[“servant”,“Servant”,“tag-servant”]].map(([type,label,cls])=>(
+<button key={type} className=“rune-btn sm” style={{fontSize:“0.5rem”}} onClick={()=>addConsequence(p.id,type,label)}>{label}</button>
+))}
+</div>
+{(p.consequences||[]).map((c,i)=><div key={i} style={{display:“flex”,alignItems:“center”,gap:8,marginBottom:4}}><span className={`tag tag-${c.type}`}>{c.label}</span><button className=“rune-btn danger sm” style={{padding:“1px 5px”}} onClick={()=>rmConsequence(p.id,i)}>✕</button></div>)}
+<div style={{display:“flex”,gap:8,marginTop:14,flexWrap:“wrap”}}>
+<button className=“rune-btn sm” onClick={()=>{updatePlayer(p.id,{giftPowerUsed:!p.giftPowerUsed});}}>{p.giftPowerUsed?“🔒 Gift Used”:“✨ Use Gift Power”}</button>
+<button className=“rune-btn sm” onClick={()=>{if(!p.companion){const type=Object.keys(COMPANION_TYPES)[0];assignCompanion(p.id,type);}else{updatePlayer(p.id,{companion:null});addLog({type:“note”,who:p.charname,what:“Companion dismissed.”});}}}>{p.companion?“Release Companion”:“Assign Companion”}</button>
+<button className={`rune-btn sm${p.protectionBalance>0?" success":""}`} onClick={()=>updatePlayer(p.id,{protectionBalance:p.protectionBalance>0?0:1})}>{p.protectionBalance>0?“🔰 Protected”:“Add Protection”}</button>
+</div>
+</div>
+</div>
+);
+};
+
+/* ── NAV CONFIG ── */
+const NAV = [
+{sec:“Play”,items:[
+{id:“players”,label:“The Roster”,icon:“⚔️”},
+{id:“dice”,label:“Oracle’s Dice”,icon:“🎲”},
+{id:“combat”,label:“Box Battle”,icon:“💥”},
+{id:“log”,label:“Session Log”,icon:“📋”},
+]},
+{sec:“World”,items:[
+{id:“map”,label:“World Map”,icon:“🗺️”},
+{id:“villains”,label:“Villains”,icon:“🔴”},
+{id:“hq”,label:“Moon Squad HQ”,icon:“🏠”},
+]},
+{sec:“Reference”,items:[
+{id:“compendium”,label:“Compendium”,icon:“📖”},
+]},
+];
+
+const currentPanel = () => {
+switch(tab) {
+case “players”: return <PlayersPanel />;
+case “map”: return <MapPanel />;
+case “dice”: return <DicePanel />;
+case “log”: return <LogPanel />;
+case “combat”: return <CombatPanel />;
+case “villains”: return <VillainsPanel />;
+case “hq”: return <HQPanel />;
+case “compendium”: return <CompendiumPanel />;
+default: return <PlayersPanel />;
+}
+};
+
+const NavItems = () => (
+<>
+{NAV.map(section => (
+<div key={section.sec} className="nav-section">
+<div className="nav-section-label">{section.sec}</div>
+{section.items.map(item => (
+<div key={item.id} className={`nav-item${tab===item.id?" active":""}`} onClick={()=>{setTab(item.id);setDrawerOpen(false);}}>
+<span className="nav-icon">{item.icon}</span>
+{item.label}
+</div>
+))}
+<div className="nav-divider" />
+</div>
+))}
+<div style={{padding:“10px 16px”,marginTop:“auto”}}>
+<div style={{fontFamily:”‘Cinzel’,serif”,fontSize:“0.42rem”,color:“var(–parch-shadow)”,letterSpacing:“2px”,textAlign:“center”,opacity:0.5}}>THE HOLLOW REALM v2.0<br/>SANDY SANDALS</div>
+</div>
+</>
+);
+
+return (
+<>
+<style>{CSS}</style>
+<div id="hollow-app">
+{/* Desktop sidenav */}
+<div className="sidenav">
+<div className="sidenav-logo">
+<h1>🌑 THE HOLLOW REALM</h1>
+<div className="subtitle">GM SUITE — SEASON II</div>
+<div className="session-pip">
+<div className={`session-dot${sessionActive?"":" off"}`}/>
+{sessionActive ? `SESSION ${sessionNumber} LIVE` : “OFFLINE”}
+</div>
+</div>
+<div style={{flex:1,overflowY:“auto”,overflowX:“hidden”}}>
+<NavItems />
+</div>
+</div>
+
+```
+    {/* Main content */}
+    <div className="main-content">
+      {/* Mobile topbar */}
+      <div className="topbar">
+        <div className="topbar-title">🌑 HOLLOW REALM</div>
+        <button className="topbar-menu-btn" onClick={()=>setDrawerOpen(true)}>☰ Menu</button>
+      </div>
+
+      {/* Panel area */}
+      <div className="panel-area">
+        {currentPanel()}
+      </div>
+
+      {/* Mobile bottom nav */}
+      <div className="bottom-nav">
+        <div className="bottom-nav-inner">
+          {NAV.flatMap(s=>s.items).map(item=>(
+            <div key={item.id} className={`bnav-item${tab===item.id?" active":""}`} onClick={()=>setTab(item.id)}>
+              <span className="bnav-icon">{item.icon}</span>
+              {item.label}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+
+    {/* Mobile drawer */}
+    <div className={`drawer-overlay${drawerOpen?" open":""}`} onClick={()=>setDrawerOpen(false)} />
+    <div className={`drawer${drawerOpen?" open":""}`}>
+      <div style={{padding:"16px",borderBottom:"1px solid var(--ember)",fontFamily:"'Cinzel Decorative',serif",fontSize:"0.7rem",color:"var(--ember-glow)",letterSpacing:"2px"}}>🌑 THE HOLLOW REALM</div>
+      <NavItems />
+    </div>
+
+    {/* Modals */}
+    <AddPlayerModal />
+    <PlayerModal />
+
+    {/* Add item quick modal */}
+    {addItemTarget && (() => {
+      const p = players.find(x=>x.id===addItemTarget);
+      return p ? (
+        <div className="modal-overlay open" onClick={e=>{if(e.target===e.currentTarget)setAddItemTarget(null);}}>
+          <div className="modal-box" style={{maxWidth:400}}>
+            <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:16}}>
+              <div style={{fontFamily:"'Cinzel',serif",fontSize:"0.72rem",color:"var(--ember-glow)"}}>+ Add Item to {p.charname}</div>
+              <button className="rune-btn danger sm" onClick={()=>setAddItemTarget(null)}>✕</button>
+            </div>
+            <label className="form-label">Item Name</label>
+            <input className="scroll-input" value={addItemForm.name} onChange={e=>setAddItemForm(f=>({...f,name:e.target.value}))} placeholder="Item name…" style={{marginBottom:8}} />
+            <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+              <div><label className="form-label">Rarity</label><select className="scroll-select" value={addItemForm.rarity} onChange={e=>setAddItemForm(f=>({...f,rarity:e.target.value}))}>{Object.keys(RARITY_COLOR).map(r=><option key={r} value={r}>{r}</option>)}</select></div>
+              <div><label className="form-label">Condition</label><select className="scroll-select" value={addItemForm.condition} onChange={e=>setAddItemForm(f=>({...f,condition:e.target.value}))}>{["Pristine","Worn","Damaged","Broken"].map(c=><option key={c} value={c}>{c}</option>)}</select></div>
+            </div>
+            <button className="rune-btn full" onClick={()=>addItem(addItemTarget)}>+ Add Item</button>
+          </div>
+        </div>
+      ) : null;
+    })()}
+  </div>
+</>
+```
+
+);
+}
