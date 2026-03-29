@@ -2804,7 +2804,12 @@ const CompendiumPanel = () => (
 <div className="fade-in">
 <div className="section-title">📖 The Compendium</div>
 <div className="scroll-tabs" style={{marginBottom:14}}>
-{[[“races”,“Races”],[“companions”,“Companions”],[“classes”,“Classes”],[“rules”,“Rules & FAQ”]].map(([k,l])=>(
+<div className="scroll-tabs" style={{marginBottom:14, flexWrap:"wrap"}}>
+{[["races","Races"],["companions","Companions"],["classes","Classes"],["rules","Rules & FAQ"], ["weapons","Weapons"], ["armor","Armor"], ["enchantments","Enchantments"], ["merchants","Merchants"], ["loot","Loot Tables"]].map(([k,l])=>(
+<div key={k} className={`scroll-tab${compendiumTab===k?" active":""}`} onClick={()=>setCompendiumTab(k)}>{l}</div>
+))}
+</div>
+
 <div key={k} className={`scroll-tab${compendiumTab===k?" active":""}`} onClick={()=>setCompendiumTab(k)}>{l}</div>
 ))}
 </div>
