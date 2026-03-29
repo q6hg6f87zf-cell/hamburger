@@ -48,19 +48,175 @@ const TRAIT_TIERS = [
 ];
 
 const RACES = {
-“Dust-Walker”:{icon:“🏜️”,stats:{STR:0,DEF:0,INT:0,WIS:2,SPD:1,CHA:-2,LCK:0},ability:“Void-Scarred — Once/session, ignore a magical attack entirely.”,biological_quirk:“In darkness: full night vision. In sunlight: -1 to hit (photosensitive skin).”,lore:“Nomads who walked too close to the void, and the void walked back.”},
-“Garrison-Born”:{icon:“🛡️”,stats:{STR:1,DEF:2,INT:0,WIS:0,SPD:-1,CHA:0,LCK:0},ability:“Iron Discipline — Immune to Fear. +1 combat rolls beside an ally.”,biological_quirk:“Dense bones: 50% less blunt damage but sinks instantly in water.”,lore:“Descendants of a ruined empire who refuse to admit the war is over.”},
-“The Sunken”:{icon:“📜”,stats:{STR:-1,DEF:0,INT:2,WIS:0,SPD:0,CHA:2,LCK:1},ability:“Silver Tongue — 10% Black Market discount. Never surprised.”,biological_quirk:“Bioluminescent in total darkness. Runs the information economy.”,lore:“Archive scholars who never left the sinking library. Information is currency.”},
-“Aether-Kith”:{icon:“✨”,stats:{STR:-2,DEF:-1,INT:3,WIS:2,SPD:0,CHA:1,LCK:2},ability:“Arcane Conduit — Absorb a spell targeting you; add to next roll (once/session).”,biological_quirk:“Cannot wear metal armor without -2 INT. Born in a Hollow rift.”,lore:“Half-real beings shaped by the Hollow before birth. The void is their cradle.”},
-“Hollow-Touched”:{icon:“🌑”,stats:{STR:1,DEF:0,INT:1,WIS:0,SPD:0,CHA:-1,LCK:3},ability:“Void Sense — Automatically detect Hollow entities within 50ft.”,biological_quirk:“Sleep replaced by 4hr trance. Immune to dream-based magic.”,lore:“Survivors of the Hollow Pull who came back changed. Most don’t discuss how.”}
+  "Dust-Walker": {
+    name: "Dust-Walker",
+    icon: "🌪️",
+    tagline: "Nomads of the Edge. They walked too close to the void, and the void walked back.",
+    stats: { STR: 0, DEF: 0, INT: 0, WIS: 2, SPD: 1, CHA: -2, LCK: 0 },
+    ability: "Void-Scarred - Once per session, ignore a magical attack or curse entirely.",
+    starting_kit: ["Scavenged Breathing Mask", "3x Dried Void-Moss (Stamina recovery)"],
+    lineage: {
+      "Ash-Stalker": "+2 Stealth in grey environments; starts with a serrated bone-knife.",
+      "Void-Oracle": "+2 WIS; can 'read' the history of an object by touching it, but takes 1 sanity damage."
+    },
+    vulnerability: "Fragile Mind: -2 to saves against Psychic or Mind-Control effects due to the void-thinning of their psyche.",
+    interaction_mod: "Dogs and natural animals growl or flee when a Dust-Walker is within 10 feet.",
+    biological_quirk: "Photosensitive and Void-Saturated: Their prolonged exposure to the Hollow's Edge has physically altered their biology. In complete darkness, their pupils dilate to cover the entire eye, granting near-perfect night vision (+2 Perception). However, their skin is highly sensitive to unfiltered UV light, causing it to crack and ash if exposed to direct, un-shielded sunlight, resulting in a -1 penalty to hit and extreme physical discomfort.",
+    social_standing: "Outcasts and Omen-Bringers: In civilized settlements, Dust-Walkers are treated with a mix of deep superstition and outright hostility. Tavern owners will often turn them away, and merchants regularly charge a 5% 'Void Tax' just to scrub the counter after they leave. However, underground syndicates and desperate explorers pay top dollar for their tracking skills, as no one else can navigate the shifting topography of the Edge.",
+    philosophy: "The Void is not an ending; it is a conversation: To a Dust-Walker, silence is heavy and the emptiness speaks. They believe that fighting the decay of the world is a fool's errand. Instead, one must learn the rhythm of the collapse and move with it. Survival isn't about building fortresses; it's about being light enough to outrun the fall.",
+    taboo: "Sleeping under a clear, un-obscured sky: Dust-Walkers believe the stars are not celestial bodies, but the unblinking eyes of the entities that inhabit the deeper void. Sleeping without a heavy canopy, a cave roof, or at least a thick hat pulled over the face is considered an invitation for those entities to 'look back' into the sleeper's soul.",
+    fear: "The Static: They do not fear monsters or men. They fear 'The Static'—a psychological and physical phenomenon where the ambient noise of the world drops out, replaced by a low, grinding hum. To a Dust-Walker, the Static means the void is actively thinning the reality around them, and if they do not move immediately, they will simply cease to exist.",
+    lore: "Generations ago, these were the frontier families and scouts who lived on the extreme borders of the Crumbling Kingdom. When the realm shifted and the Edge began to devour the land, they didn't flee inward; they adapted. They are a quiet, insular people who trade in whispers and old survival techniques. They cover themselves head-to-toe not just for protection from the elements, but to hide the unnatural, faint violet glow that the void left stained behind their eyes.",
+    character_description: "Height ranges from 5'10\" to 6'4\". They possess lean, lanky, and severely weathered builds, looking as though the moisture has been slowly baked out of them. They dress in heavily layered, dust-caked leather dusters, rugged canvas pants, and thick boots designed for treacherous terrain. Their faces are usually obscured by heavy bandanas and wide-brimmed western hats. Their most defining feature is their eyes: the irises carry a faint, unnatural violet luminescence, heavily contrasting with their dirt-smudged, sun-deprived skin. Their movements are deliberate, eerily quiet, and lack wasted energy."
+  },
+  "Garrison-Born": {
+    name: "Garrison-Born",
+    icon: "🛡️",
+    tagline: "The stubborn descendants of a ruined empire.",
+    stats: { STR: 1, DEF: 2, INT: 0, WIS: 0, SPD: -1, CHA: 0, LCK: 0 },
+    ability: "Iron Discipline - Immune to 'Fear' status. +1 to all combat rolls when fighting directly adjacent to an ally.",
+    starting_kit: ["Dented Sigil Ring", "Standard Issue whetstone", "Ration Tin"],
+    lineage: {
+      "Iron-Guard": "+3 DEF when standing still; starts with a heavy tower shield.",
+      "Vanguard-Scout": "+2 SPD; can ignore 'Difficult Terrain' as long as they are moving toward an enemy."
+    },
+    vulnerability: "Heavy-Footed: Suffer a -4 penalty to all Stealth checks involving water or metal flooring.",
+    interaction_mod: "Merchants give them 10% off gear, but expect them to defend the town for free if an alarm sounds.",
+    biological_quirk: "Dense Bone Structure: Centuries of consuming specialized military alchemical rations have permanently altered their genetic makeup. Their bones are nearly twice as dense as a normal human's. This allows them to take 50% less damage from blunt force trauma or long falls, but it completely robs them of buoyancy. A Garrison-Born will sink like an anvil in deep water and cannot swim unassisted.",
+    social_standing: "Relics of Authority: They walk through the world like landlords whose lease expired a century ago. In rural villages, they are respected and feared, often able to bypass low-level militia checkpoints purely on the authority of their posture. In lawless hubs, they are targeted as symbols of an oppressive past. People expect them to be the meat-shields in any crisis, demanding their protection as a lingering obligation of their bloodline.",
+    philosophy: "Steel lasts longer than hope; polished steel lasts forever: They view the apocalypse not as the end of the world, but as a test of structural integrity. Emotion, panic, and individuality are structural flaws. Routine, chain of command, and maintaining one's equipment are the highest virtues. A well-maintained rifle is prayer; a perfectly executed tactical retreat is a sacrament.",
+    taboo: "Unrecorded Retreat: Fleeing a battle without an officer's verbal or written command is the ultimate sin. A Garrison-Born who breaks rank in a panic is stripped of their family sigil and 'Erased' from the lineage. They become nameless, and other Garrison-Born are forbidden from acknowledging their existence, even if they are burning alive.",
+    fear: "Rust of the Mind: They are terrified of losing their purpose. While they obsessively clean their gear to prevent physical rust, their true nightmare is the 'rusting' of the mind—dementia, memory loss, or waking up one day and forgetting why they are fighting. Without their history and their orders, they believe they are nothing but violent animals.",
+    lore: "When the Crumbling Kingdom fractured and society dissolved into chaos, the grand military apparatus refused to dissolve with it. Cut off from command, individual battalions entrenched themselves in fortresses, passing down ranks, protocols, and grudges through the generations. They treat the current broken world as a temporary occupation zone, treating every minor skirmish like a calculated campaign for a throne that turned to dust centuries ago.",
+    character_description: "Height ranges from 5'8\" to 6'2\". They possess incredibly dense, broad-shouldered, and muscular builds, shaped by generations of strict physical regimens. They visually represent battlefield grit: battered plate armor integrated with heavy chainmail, worn over thick, utilitarian coats. Their clothing features tarnished kingdom crests and faded insignias. Hair is kept practically cropped or shaved. Their faces and bodies are maps of heavy, jagged scarring, and their posture is always rigid, scanning the room for tactical advantages."
+  },
+  "The Sunken": {
+    name: "The Sunken",
+    icon: "💧",
+    tagline: "Information is a currency, and they run the mint.",
+    stats: { STR: -1, DEF: 0, INT: 2, WIS: 0, SPD: 0, CHA: 2, LCK: 1 },
+    ability: "Silver Tongue - Start the game with a 'Black Ledger.' 10% discount on all Black Market trades.",
+    starting_kit: ["Encoded Ledger", "Silver Pocket Watch", "Fine Silk Handkerchief"],
+    lineage: {
+      "Guild-Broker": "Starts with 500 extra credits and a 'Favor' token from a high-ranking NPC.",
+      "Inksmith": "Can craft 'Living Tattoos' that grant one-time magical buffs to the wearer."
+    },
+    vulnerability: "Dehydrated: If they don't consume double the water of a normal human, they suffer 'Exhaustion' levels twice as fast.",
+    interaction_mod: "Guards follow them constantly in shops. They are known for 'disappearing' small, expensive items.",
+    biological_quirk: "Amphibious Adaptation: Generation after generation spent in the submerged, flooded levels of the old world has altered their respiratory systems. They possess subtly recessed gills along their ribcages, allowing them to hold their breath in high-stress situations for up to 10 minutes. Furthermore, their eyes possess a secondary membrane, allowing them to see perfectly in murky water, and they suffer absolutely zero movement penalties when submerged.",
+    social_standing: "High-Society Syndicates: The Sunken are the aristocrats of the underworld. They are incredibly wealthy, universally distrusted, and absolutely essential to the global economy. Commoners view them as loan sharks and mobsters, while the elite view them as necessary evils. Because everyone knows The Sunken deal in blackmail, NPCs are inherently guarded around them, imposing a -1 penalty to friendly persuasion simply because no one wants to end up in their ledger.",
+    philosophy: "A secret is only valuable if someone is willing to kill for it: Violence is cheap; leverage is priceless. The Sunken believe that physical warfare is a failure of negotiation. True power is walking into a room unarmed and having the most dangerous person there offer you a chair because you know what they did five summers ago. Everything—and everyone—has a price.",
+    taboo: "Uncouth Brutality: Resorting to an unprovoked fistfight or messy assassination is deeply humiliating to a Sunken's reputation. Using a blunt instrument when a bribe, a threat, or a subtle poison would have sufficed is considered barbaric. Those who act like 'thugs' are exiled from the inner circles of the archives.",
+    fear: "Desiccation: A deep, biological terror of profound dryness. If a Sunken spends more than a week away from high humidity, coastal fog, or the flooded ruins, their skin begins to painfully crack, and their lungs ache with every breath. The idea of dying of thirst in a desert is their equivalent of hell.",
+    lore: "When the great shift drowned the grand libraries and banking districts of the old world, the archivists and financiers didn't drown; they evolved. Trapped in the flooded metropolis, they formed syndicates to protect the restricted knowledge and pre-shift artifacts they controlled. Today, they operate out of water-logged manors and hidden subterranean docks, running a massive shadow economy based entirely on debts, favors, and hoarded history.",
+    character_description: "Height ranges from 5'5\" to 6'0\". They have sleek, sharp, and flawlessly poised builds. Visually, they combine high-class elegance with aquatic decay: immaculately tailored dark coats that are permanently damp or water-stained at the hems, paired with ornate, oxidized silver jewelry. Their hair is eternally slicked back, and their skin has a slightly pale, cold sheen. Their expressions are calculating, aloof, and carry the distinct look of someone calculating exactly how much you are worth in an auction."
+  },
+  "Deep-Claimed": {
+    name: "Deep-Claimed",
+    icon: "⛏️",
+    tagline: "Trapped in the dark, they became harder than the stone.",
+    stats: { STR: 2, DEF: 1, INT: -1, WIS: 0, SPD: 0, CHA: -1, LCK: 0 },
+    ability: "Stonebreaker - Can mine Hollow Ore without tools and naturally detect structural traps in the dark.",
+    starting_kit: ["Heavy Work Gloves", "Glowing Ore Fragment (Light source)", "Chisel"],
+    lineage: {
+      "Bedrock-Bulwark": "Cannot be knocked down or pushed back by physical force.",
+      "Ore-Seer": "Can smell precious metals through up to 5 feet of solid stone."
+    },
+    vulnerability: "Light-Blinded: Suffer -3 to all rolls for 1 hour after being exposed to a 'Flashbang' or magical bright light.",
+    interaction_mod: "Other races find their 'Ore-Skin' unsettling; -2 to CHA when attempting to seduce or charm non-Deep-Claimed.",
+    biological_quirk: "Ore-Skin Calcification: To survive the starvation of the deep caverns, they consumed trace amounts of volatile Hollow Ore. Over generations, this ore has integrated into their physiology. Their skin is incredibly rough, providing a natural +1 to DEF when unarmored, as blunt blades literally chip against their flesh. However, this calcification makes wearing traditional metal armor excruciatingly uncomfortable, causing a claustrophobic reaction (-1 SPD).",
+    social_standing: "The Exploited Foundation: They are the ultimate labor class, viewed by surface-dwellers as little more than talking heavy machinery. In industrial hubs and mining towns, they are welcomed for their unmatched work ethic. In high-society or political arenas, they are treated as uneducated brutes. They are the backbone of the realm's infrastructure, yet they are rarely allowed to sit at the tables of the cities they built.",
+    philosophy: "The mountain gives nothing; you must take it: Deep-Claimed do not believe in luck, divine intervention, or charity. They believe entirely in the physics of effort. If you strike the stone long enough, it breaks. If you endure the dark long enough, you survive. They value sheer, unrelenting persistence above all intellectual or magical pursuits.",
+    taboo: "Wasting the Light: In the deep dark, fuel is life. Leaving a torch to burn out in an empty room, or throwing away a spark-flint before it is completely stripped, is considered a crime bordering on murder. Those who waste heat or light are often tied to a cavern wall and left in the pitch black for three days to 'learn the value of a spark'.",
+    fear: "The 'Wide-Open' (Agoraphobia): Deep-Claimed feel secure when surrounded by tons of crushing rock; it feels like an embrace. When they are brought to the surface and placed under a cloudless, endless blue sky, they suffer profound vertigo and panic attacks. The lack of a 'ceiling' makes them feel as though gravity might fail and they will fall upward into the terrifying expanse of the cosmos.",
+    lore: "When the realm fractured, thousands of miners and underground survivalists were entirely sealed off in the deepest subterranean networks. Cut off from surface agriculture, they survived by farming bioluminescent fungi and integrating the magical Hollow Ore into their diet. Decades in the pitch black transformed them into fiercely territorial, hulking behemoths who worship the veins of the earth and distrust anything that requires sunlight to grow.",
+    character_description: "Height ranges massively from 6'0\" to 6'8\". They are hulking, barrel-chested, and violently muscular, built to swing hammers for 16 hours a day. Their skin is deathly pale, heavily stained with permanent soot, and visibly textured with raw, faintly glowing veins of ore that protrude from their forearms and neck. They wield heavy, brutal iron mining tools (picks, sledgehammers) as weapons. They rarely wear full shirts, preferring thick leather harnesses rigged with glowing ore chunks that illuminate their subterranean surroundings."
+  },
+  "Aether-Kith": {
+    name: "Aether-Kith",
+    icon: "✨",
+    tagline: "The remnants of the high-culture, now drifting between states of matter.",
+    stats: { STR: -2, DEF: -1, INT: 1, WIS: 1, SPD: 0, CHA: 1, LCK: 3 },
+    ability: "Phase Shift - Once per combat, move through a solid object or enemy without provoking an attack.",
+    starting_kit: ["Glass Vial of Essence", "Translucent Cape", "Ancient Map Fragment"],
+    lineage: {
+      "Wisp-Kin": "Can temporarily hover over gaps or pressure plates without triggering them.",
+      "Spark-Weaver": "Can generate small localized electrical charges to power old technology or shock targets."
+    },
+    vulnerability: "Disrupted Form: Take 1d4 damage every turn they end their movement inside a strong magnetic or anti-magic field.",
+    interaction_mod: "People often speak loudly and slowly to them, assuming they aren't fully 'there,' which gives a +1 to deceptive misdirection.",
+    biological_quirk: "Semi-Ethereal Mass: The Aether-Kith are not entirely bound to the physical plane. They possess almost zero physical weight, meaning they never suffer from 'Encumbered' penalties and leave no footprints on soft ground. However, this lack of mass is dangerous; a strong gust of wind or a kinetic shockwave/blast effect will deal double damage to them, easily launching them across a battlefield.",
+    social_standing: "Coveted Curiosities: To the average citizen, an Aether-Kith is a ghost, treated with a mix of awe, religious reverence, or profound unease. To scholars and underground syndicates, they are priceless commodities. They are heavily targeted by kidnappers and dark mages who wish to harvest their essence or study their shifting atomic structure. They rarely find a place to belong and are usually treated as 'objects' rather than people.",
+    philosophy: "Form is temporary; energy is eternal: They view the physical struggles of the other races—wars over land, hoarding of gold—as deeply tragic and short-sighted. They believe that true enlightenment comes from shedding attachments to the material world. To an Aether-Kith, the mind and the spirit are the only things that truly exist; the body is merely a temporary, highly flawed vessel.",
+    taboo: "Material Hoarding: Becoming overly attached to a physical object is seen as an anchor that corrupts the soul. An Aether-Kith who collects trinkets, refuses to share supplies, or values gold over experience is viewed by their kin as 'heavy' or 'sinking'. A true Aether-Kith carries only what is immediately necessary to maintain their temporary physical anchor.",
+    fear: "The 'Anchor': A legendary, localized anti-magic phenomenon scattered across the Hollow Realm. If an Aether-Kith remains in an Anchor field for too long, their ethereal atoms permanently calcify. The idea of being permanently solidified, trapped in a heavy, failing meat-sack like the rest of the races, is a fate far worse than death. It is claustrophobia on a molecular level.",
+    lore: "Centuries ago, the grand mages of the high-culture attempted a massive ritual to ascend beyond physical limitations just as the Crumbling Kingdom fell. The ritual was interrupted, leaving their descendants trapped halfway between reality and the aether. They drift through the Hollow Realm as shimmering anomalies, struggling to maintain their physical coherence and desperately searching for a way to either complete the ascension or reverse the curse.",
+    character_description: "Height averages from 5'6\" to 6'2\", but their outlines constantly blur and shift slightly. They are incredibly slender and ethereal, appearing almost weightless. Their skin is translucent, shimmering with a soft, bioluminescent glow (usually pale blues, purples, or golds) that pulses in time with their heartbeat. They wear flowing, iridescent garments made of ultra-light silks and carry floating, gravity-defying jewelry. Looking directly at them is like looking at a person through a heat haze or a prism."
+  },
+  "Hollow-Touched": {
+    name: "Hollow-Touched",
+    icon: "👁️",
+    tagline: "Marked by the void.",
+    stats: { STR: 1, DEF: 0, INT: 1, WIS: 0, SPD: 0, CHA: -1, LCK: 3 },
+    ability: "Void Resonance"
+  }
 };
 
 const COMPANION_TYPES = {
-“Void Hound”:{icon:“🐺”,hp:5,statBuff:{STR:1},active_ability:“Shadow Lunge — Intercept one incoming attack per session.”,passive_trait:“Pack Bond — +1 all combat rolls while active.”,maintenance:“Feeds on raw meat and negative energy. Cannot be healed by standard kits.”,behavior_quirk:“Does not sleep. Sits rigidly, staring into the darkest corner.”},
-“Scavenger Crow”:{icon:“🦅”,hp:3,statBuff:{LCK:1},active_ability:“Pilfer — Steal a small object up to 30ft without breaking stealth.”,passive_trait:“Grave Robber (+10% Loot Luck) — Auto-scavenge after every combat.”,maintenance:“Must be bribed with shiny objects or it drops your inventory items.”,behavior_quirk:“Mimics the last words of people it watched die.”},
-“Clockwork Mule”:{icon:“⚙️”,hp:8,statBuff:{DEF:1},active_ability:“Mobile Barricade — Lock joints; grant +2 DEF to allies using it as cover.”,passive_trait:“Tireless Hauler — +5 Inventory Slots.”,maintenance:“Cannot be healed by magic. Needs scrap parts and oil to repair.”,behavior_quirk:“Constantly vents steam. -1 group Stealth while moving.”},
-“Mender Sprite”:{icon:“💫”,hp:2,statBuff:{WIS:1},active_ability:“Cauterizing Sap — Heal 1d6 HP; target gets -1 to next attack from extreme pain.”,passive_trait:“Guardian Light — Once/session, stabilize player at 1 HP by sacrificing itself.”,maintenance:“Feeds on ambient magic. Takes double damage from AoE attacks.”,behavior_quirk:“Hums constantly. Light flashes violently when sensing danger.”}
+  "Void-Hound": {
+    name: "Void-Hound",
+    icon: "🐺",
+    hp: 5,
+    statBuff: { CHA: 1 },
+    active_ability: "Echo Bark - Command the hound to 'speak'. It releases a concussive soundwave. Enemies within 15 feet must roll to resist being 'Stunned' for one turn, and hidden enemies are instantly revealed.",
+    passive_trait: "Scent of the Collapse - The hound will naturally whine and pace when a magical trap, void anomaly, or ambush is in the next room, giving the player a +2 to initiative or trap detection.",
+    maintenance: "Feeds on raw meat and negative energy. Cannot be healed by standard medical kits; must 'consume' the shadow of a defeated enemy to regain HP.",
+    behavior_quirk: "They do not sleep. When the player rests, the hound simply sits rigidly, staring directly into the darkest corner of the room.",
+    lore: "Forged from the ash of the Edge and bound by dark magic. They are fiercely loyal to whoever binds them, but deeply unsettling to anyone who isn't their master, often viewed as walking bad omens.",
+    physical_description: "Roughly the size of a large timber wolf, but lacking solid flesh. Its body is composed of tightly swirling black ash, compacted shadow, and glowing orange cinders that flare up when it is agitated. It has no discernible eyes, only two hollow, jagged indentations in its skull where faint, violet smoke constantly leaks and trails behind it as it moves.",
+    sensory_profile: "Smells strongly of ozone, sulfur, and a freshly extinguished campfire. It leaves no footprints, only faint scorch marks. It does not pant or breathe. When it barks or snarls, the sound does not seem to come from its mouth; instead, it is a localized, bass-heavy rumble that echoes off the walls behind you, creating a disorienting, surround-sound effect of pure malice."
+  },
+  "Scavenger Crow": {
+    name: "Scavenger Crow",
+    icon: "🦅",
+    hp: 3,
+    statBuff: { LCK: 1 },
+    active_ability: "Pilfer - Point at a small, unsecured object up to 30 feet away (a key, a potion, a coin pouch). The crow will fly out, grab it, and return it to your inventory without breaking your stealth.",
+    passive_trait: "Grave Robber (+10% Loot Luck) - After every combat encounter, the crow will automatically scavenge the area, rolling an independent loot check to find extra credits, ammo, or small trinkets.",
+    maintenance: "Requires constant bribery. If you do not give it a 'shiny' object (even a worthless coin) once every few days, it will start dropping your inventory items out of spite.",
+    behavior_quirk: "It mimics human voices perfectly, but only repeats the last words of people it has watched die.",
+    lore: "Mutated corvids that survived the shift by becoming smarter and meaner. Having one on your shoulder marks you as a hardened survivor, but also guarantees that civilized folk will keep a very close eye on their pockets.",
+    physical_description: "Abnormally massive, easily the size of a wild turkey, with heavily scarred, leathery skin visible beneath patchy plumage. Its feathers are a greasy, iridescent black, constantly mottled with pale dust. Its beak is jagged, serrated like a rusted bread knife. It often decorates itself, weaving stolen copper wire into its feathers or forcing stolen rings onto its thick, scaly talons.",
+    sensory_profile: "Emits a smell like old copper coins and dried blood. Its movements are heralded by the heavy, leathery thwump of its wings and the dry, rhythmic clicking of its beak. When it 'speaks', there is no bird-like squawk; it produces an eerily flawless, uncompressed recording of human terror, matching the exact pitch, breathlessness, and panic of the voice it stole."
+  },
+  "Clockwork Mule": {
+    name: "Clockwork Mule",
+    icon: "⚙️",
+    hp: 8,
+    statBuff: { DEF: 1 },
+    active_ability: "Mobile Barricade - Command the Mule to lock its heavy hydraulic joints. It becomes an immovable object, granting +2 DEF to any ally using it as cover. It cannot move or carry items while locked.",
+    passive_trait: "Tireless Hauler (+5 Inventory Slots) - As long as it is functioning, you ignore standard encumbrance rules for heavy gear like mining tools or excess armor.",
+    maintenance: "Cannot be healed with magic or medicine. Requires 'Scrap Parts' and oil to repair. If it hits 0 HP, it drops all its cargo on the ground and must be rebooted at a workbench.",
+    behavior_quirk: "Its gears grind endlessly, and it occasionally vents hot steam out of unexpected valves. Imposes a permanent -1 penalty to the group's Stealth checks while moving.",
+    lore: "Relics of the old mining guilds from the Crumbling Kingdom. They are entirely emotionless, relentlessly grinding forward as long as their mainspring is wound, completely indifferent to the apocalypse happening around them.",
+    physical_description: "Built like a mechanical, headless bulldog the size of a draft horse. Plated in thick, tarnished iron and bronze boilerplate armor, heavily dented from years of rockfalls. Faded, painted kingdom crests are still barely visible on its flanks. Its four legs are driven by exposed hydraulic pistons, ending in heavy, flat iron hooves fitted with worn-out rubber shock absorbers.",
+    sensory_profile: "Radiates an immense amount of physical heat. The air around it constantly smells of burning coal, hot engine oil, and heated brass. It is incredibly loud—even when standing still, there is a rhythmic, heavy ticking from its internal clockwork. When it walks, there is a violent *clank-hiss* of unlubricated pneumatics and metal grinding against stone."
+  },
+  "Mender Sprite": {
+    name: "Mender Sprite",
+    icon: "✨",
+    hp: 2,
+    statBuff: { WIS: 1 },
+    active_ability: "Cauterizing Sap - Command the sprite to heal a target. Restores 1d6 HP by violently sealing the wound with glowing, burning sap. The extreme pain gives the target a -1 to their next attack roll.",
+    passive_trait: "Guardian Light (Auto-stabilize) - Emits a soft, 10-foot radius of bioluminescent light. Once per session, if the player drops to 0 HP, the sprite will instantly kamikaze into the wound, stabilizing the player at 1 HP but dying in the process.",
+    maintenance: "Feeds on ambient magic and Hollow Ore dust. Highly fragile; takes double damage from physical area-of-effect attacks.",
+    behavior_quirk: "Hums constantly. When it is agitated or sensing danger, the light it emits flashes violently through different spectrums, acting as an unintended warning siren.",
+    lore: "Bioluminescent, semi-sentient aether entities that hover around dense magical areas. They are aggressively helpful, seeking out open wounds to seal them, though their brutal survival-instinct methods are often intensely painful for the patient.",
+    physical_description: "It is not humanoid in the slightest. It appears as a jagged, floating shard of crystallized amber or a dying, contained star. Its core is made of thick, pulsing liquid gold, surrounded by erratic, orbiting rings of raw, crackling aether energy. It constantly drips a viscous, glowing sap that evaporates before it hits the ground.",
+    sensory_profile: "Smells intensely sharp, like crushed pine needles mixed with heavy electrical ozone. It sounds like a high-tension power line caught in high wind, emitting a constant, vibrating hum. When it applies its healing sap, it produces a sudden, violent sizzle—exactly like a slab of raw meat being thrown onto a white-hot iron skillet."
+  }
 };
+
 
 const WORLD_LOCATIONS = [
 {id:“hq”,name:“Moon Squad HQ”,short:“HQ”,icon:“🏠”,color:”#ffd54f”,x:50,y:48,danger:1,desc:“The sanctuary of the Moon Squad. Safe, fortified, and growing.”,features:[“The Forge — Repair & Enchant”,“The Infirmary — Heal & Purify”,“The Ledger — Daily Shop”,“The Bunkhouse — Personal Quarters”],connectedTo:[“forest”,“kingdom”,“caverns”,“library”,“edge”]},
