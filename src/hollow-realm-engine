@@ -3106,12 +3106,142 @@ const PlayerLoreTab = ({ player, setPlayers }) => {
           </div>
 
         </div>
-      )}
-    </div>
-  );
-};
+        )}
 
-};
+  {compendiumTab==="weapons" && (
+    <div className="fade-in">
+      {Object.keys(ARSENAL_WEAPONS).map(cls => (
+        <div key={cls} style={{ marginBottom: "24px" }}>
+          <h3 style={{ color: "var(--blue)", borderBottom: "1px solid rgba(79, 195, 247, 0.2)", paddingBottom: "4px", fontFamily: "'Cinzel', serif" }}>{cls} Arsenal</h3>
+          <div style={{ display: "grid", gap: "8px" }}>
+            {ARSENAL_WEAPONS[cls].map((w, i) => (
+              <div key={i} className="dark-card" style={{ padding: "10px", borderLeft: `3px solid ${w.color || "var(--dim)"}` }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <strong style={{ color: "var(--text)", fontSize: "0.9rem", fontFamily: "'Cinzel', serif" }}>{w.name}</strong>
+                  <span className="rarity-badge" style={{ color: w.color, border: `1px solid ${w.color}` }}>{w.rarity}</span>
+                </div>
+                <div style={{ fontSize: "0.75rem", margin: "4px 0", fontFamily: "'IM Fell English', serif" }}>
+                  <span style={{ color: "var(--red)" }}>⚔️ {w.damage}</span> | <span style={{ color: "var(--green)" }}>✨ {w.effect}</span>
+                </div>
+                <div style={{ fontSize: "0.7rem", fontStyle: "italic", color: "var(--dim)", fontFamily: "'IM Fell English', serif" }}>
+                  "{w.lore}" — Found: {w.location}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+
+  {compendiumTab==="armor" && (
+    <div className="fade-in">
+      {Object.keys(ARSENAL_ARMOR).map(cls => (
+        <div key={cls} style={{ marginBottom: "24px" }}>
+          <h3 style={{ color: "var(--blue)", borderBottom: "1px solid rgba(79, 195, 247, 0.2)", paddingBottom: "4px", fontFamily: "'Cinzel', serif" }}>{cls} Armor</h3>
+          <div style={{ display: "grid", gap: "8px" }}>
+            {ARSENAL_ARMOR[cls].map((a, i) => (
+              <div key={i} className="dark-card" style={{ padding: "10px", borderLeft: `3px solid ${a.color || "var(--dim)"}` }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <strong style={{ color: "var(--text)", fontSize: "0.9rem", fontFamily: "'Cinzel', serif" }}>{a.name}</strong>
+                  <span className="rarity-badge" style={{ color: a.color, border: `1px solid ${a.color}` }}>{a.rarity}</span>
+                </div>
+                <div style={{ fontSize: "0.75rem", margin: "4px 0", fontFamily: "'IM Fell English', serif" }}>
+                  <span style={{ color: "var(--blue)" }}>🛡️ {a.defense}</span> | <span style={{ color: "var(--green)" }}>✨ {a.effect}</span>
+                </div>
+                <div style={{ fontSize: "0.7rem", fontStyle: "italic", color: "var(--dim)", fontFamily: "'IM Fell English', serif" }}>
+                  "{a.lore}" — Found: {a.location}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  )}
+
+  {compendiumTab==="enchantments" && (
+    <div className="fade-in">
+      <div style={{ display: "grid", gap: "8px" }}>
+        {ARSENAL_ENCHANTMENTS.map((e, i) => (
+          <div key={i} className="dark-card" style={{ padding: "10px", borderLeft: `3px solid ${e.color || "var(--purple)"}` }}>
+            <div style={{ display: "flex", justifyContent: "space-between" }}>
+              <strong style={{ color: "var(--text)", fontFamily: "'Cinzel', serif" }}>{e.name}</strong>
+              <span className="rarity-badge" style={{ color: e.color, border: `1px solid ${e.color}` }}>{e.rarity}</span>
+            </div>
+            <div style={{ fontSize: "0.75rem", color: "var(--green)", margin: "4px 0", fontFamily: "'IM Fell English', serif" }}>{e.effect}</div>
+            <div style={{ fontSize: "0.7rem", fontStyle: "italic", color: "var(--dim)", fontFamily: "'IM Fell English', serif" }}>"{e.lore}"</div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )}
+
+  {compendiumTab==="merchants" && (
+    <div className="fade-in">
+      <div style={{ display: "grid", gap: "12px" }}>
+        {Object.keys(WORLD_NPCS).map(npcKey => {
+          const npc = WORLD_NPCS[npcKey];
+          return (
+            <div key={npcKey} className="dark-card glow" style={{ padding: "12px", border: `1px solid ${npc.color}40` }}>
+              <h3 style={{ margin: "0 0 4px 0", color: npc.color, fontFamily: "'Cinzel', serif" }}>{npc.icon} {npc.name}</h3>
+              <div style={{ fontSize: "0.7rem", color: "var(--dim)", textTransform: "uppercase", letterSpacing: "1px", marginBottom: "8px", fontFamily: "'Cinzel', serif" }}>
+                {npc.title} | {npc.region}
+              </div>
+              <div style={{ fontSize: "0.75rem", fontStyle: "italic", color: "var(--text)", marginBottom: "8px", borderLeft: `2px solid ${npc.color}`, paddingLeft: "8px", fontFamily: "'IM Fell English', serif" }}>
+                "{npc.quote}"
+              </div>
+              <div style={{ fontSize: "0.75rem", color: "var(--dim)", marginBottom: "8px", fontFamily: "'IM Fell English', serif" }}>
+                <strong style={{fontFamily:"'Cinzel', serif", color:"var(--ember)"}}>Interaction:</strong> {npc.interaction}
+              </div>
+              <strong style={{ fontSize: "0.75rem", color: "var(--gold)", fontFamily: "'Cinzel', serif" }}>Inventory / Services:</strong>
+              <ul style={{ margin: "4px 0 0 0", paddingLeft: "16px", fontSize: "0.75rem", color: "var(--text)", fontFamily: "'IM Fell English', serif" }}>
+                {npc.inventory.map((inv, idx) => (
+                  <li key={idx} style={{marginBottom:"2px"}}>
+                    <span style={{ color: "var(--blue)" }}>{inv.item}</span> — {inv.cost} <span style={{ color: "var(--dim)" }}>({inv.chance})</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  )}
+
+  {compendiumTab==="loot" && (
+    <div className="fade-in">
+      <div style={{ display: "grid", gap: "16px" }}>
+        <div>
+          <h3 style={{ color: "var(--gold)", marginBottom: "8px", fontFamily: "'Cinzel', serif", borderBottom: "1px solid var(--border-rune)" }}>Special Chests</h3>
+          {ARSENAL_CHESTS.map((c, i) => (
+            <div key={i} className="dark-card" style={{ padding: "8px", border: `1px solid ${c.color}50` }}>
+              <strong style={{ color: c.color, fontFamily: "'Cinzel', serif" }}>{c.name}</strong> <span style={{fontSize: "0.6rem", color:"var(--parch-shadow)"}}>({c.type})</span>
+              <div style={{ fontSize: "0.75rem", color: "var(--dim)", margin: "4px 0", fontFamily: "'IM Fell English', serif" }}><strong style={{color:"var(--ember)", fontFamily:"'Cinzel', serif"}}>Lock:</strong> {c.lockDifficulty}</div>
+              <ul style={{ margin: "4px 0 0 0", paddingLeft: "16px", fontSize: "0.7rem", color: "var(--text)", fontFamily: "'IM Fell English', serif" }}>
+                {c.loot.map((l, idx) => <li key={idx} style={{marginBottom:"2px"}}>{l.item} <span style={{color:"var(--dim)"}}>({l.chance})</span></li>)}
+              </ul>
+            </div>
+          ))}
+        </div>
+        <div>
+          <h3 style={{ color: "var(--gold)", marginBottom: "8px", fontFamily: "'Cinzel', serif", borderBottom: "1px solid var(--border-rune)" }}>Environmental Loot Bins</h3>
+          {ARSENAL_LOOT_BINS.map((b, i) => (
+            <div key={i} className="dark-card" style={{ padding: "8px", borderLeft: `3px solid ${b.color}` }}>
+              <strong style={{ color: "var(--text)", fontFamily: "'Cinzel', serif" }}>{b.name}</strong> <span style={{ fontSize: "0.7rem", color: "var(--dim)" }}>({b.location})</span>
+              <div style={{ fontSize: "0.75rem", color: "var(--green)", margin: "4px 0", fontFamily: "'IM Fell English', serif" }}><strong style={{color:"var(--ember)", fontFamily:"'Cinzel', serif"}}>Search:</strong> {b.roll}</div>
+              <ul style={{ margin: "4px 0 0 0", paddingLeft: "16px", fontSize: "0.7rem", color: "var(--text)", fontFamily: "'IM Fell English', serif" }}>
+                {b.loot.map((l, idx) => <li key={idx} style={{marginBottom:"2px"}}>{l.item} <span style={{color:"var(--dim)"}}>({l.chance})</span></li>)}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )}
+
+</div>
+);
 
 /* ── PLAYER DETAIL MODAL ── */
 const PlayerModal = () => {
