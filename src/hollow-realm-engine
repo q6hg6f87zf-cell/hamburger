@@ -2990,6 +2990,122 @@ return (
 </div>
 </div>
 );
+const PlayerLoreTab = ({ player, setPlayers }) => {
+  if (!player) return null;
+
+  const pClass = player.class;
+  const pRace = player.race;
+
+  // Helper to update the player object in your state
+  const handleChange = (field, val) => {
+    setPlayers(prev => prev.map(p => p.id === player.id ? { ...p, [field]: val } : p));
+  };
+
+  return (
+    <div style={{ marginTop: "16px", padding: "12px", background: "var(--card)", borderRadius: "6px", border: "1px solid var(--border)" }}>
+      <h3 style={{ color: "var(--gold)", borderBottom: "1px solid var(--dimmer)", paddingBottom: "4px", marginBottom: "12px", fontFamily: "'Cinzel', serif" }}>
+        Narrative & Progression
+      </h3>
+
+      {/* RACE LORE */}
+      {pRace && RACES[pRace] && (
+        <div style={{ marginBottom: "16px" }}>
+          <h4 style={{ color: "var(--blue)", marginBottom: "4px", margin: "0" }}>{RACES[pRace].icon} {pRace} Biology</h4>
+          <p style={{ fontSize: "0.8rem", color: "var(--text)", margin: "4px 0" }}>
+            <strong style={{ color: "var(--dim)" }}>Quirk:</strong> {RACES[pRace].biological_quirk}
+          </p>
+          <p style={{ fontSize: "0.8rem", color: "var(--text)", margin: "4px 0" }}>
+            <strong style={{ color: "var(--dim)" }}>Social:</strong> {RACES[pRace].social_standing}
+          </p>
+        </div>
+      )}
+
+      {/* COMPANION SELECT */}
+      <div style={{ marginBottom: "16px" }}>
+        <label style={{ fontSize: "0.75rem", color: "var(--dim)" }}>Companion</label>
+        <select className="scroll-input" value={player.companion || ""} onChange={e => handleChange("companion", e.target.value)}>
+          <option value="">-- No Companion --</option>
+          {Object.keys(COMPANION_TYPES).map(c => (
+            <option key={c} value={c}>{COMPANION_TYPES[c].icon} {COMPANION_TYPES[c].name}</option>
+          ))}
+        </select>
+        {player.companion && COMPANION_TYPES[player.companion] && (
+          <div style={{ fontSize: "0.75rem", color: "var(--text)", marginTop: "4px" }}>
+            <strong style={{color:"var(--gold)"}}>HP:</strong> {COMPANION_TYPES[player.companion].hp} | <strong style={{color:"var(--gold)"}}>Ability:</strong> {COMPANION_TYPES[player.companion].active_ability}
+            <br/><strong style={{color:"var(--dim)"}}>Quirk:</strong> {COMPANION_TYPES[player.companion].behavior_quirk}
+          </div>
+        )}
+      </div>
+
+      {/* CLASS PROGRESSION */}
+      {pClass && REP[pClass] && (
+        <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          <h4 style={{ color: "var(--blue)", marginBottom: "0px", marginTop: "8px" }}>{pClass} Paths</h4>
+
+          {/* Reputation */}
+          <div>
+            <label style={{ fontSize: "0.75rem", color: "var(--dim)" }}>Reputation / Title</label>
+            <select className="scroll-input" value={player.repTitle || ""} onChange={e => handleChange("repTitle", e.target.value)}>
+              <option value="">-- Select Title --</option>
+              {REP[pClass].map(r => <option key={r.title} value={r.title}>{r.title}</option>)}
+            </select>
+            {player.repTitle && (
+              <div style={{ fontSize: "0.75rem", color: "var(--green)", marginTop: "4px" }}>
+                {REP[pClass].find(r => r.title === player.repTitle)?.passive}
+              </div>
+            )}
+          </div>
+
+          {/* Signature Skill */}
+          <div>
+            <label style={{ fontSize: "0.75rem", color: "var(--dim)" }}>Signature Skill</label>
+            <select className="scroll-input" value={player.sigSkill || ""} onChange={e => handleChange("sigSkill", e.target.value)}>
+              <option value="">-- Select Skill --</option>
+              {SIGNATURE_SKILLS[pClass].map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
+            </select>
+            {player.sigSkill && (
+              <div style={{ fontSize: "0.75rem", color: "var(--green)", marginTop: "4px" }}>
+                {SIGNATURE_SKILLS[pClass].find(s => s.name === player.sigSkill)?.desc}
+              </div>
+            )}
+          </div>
+
+          {/* Shadow Trait */}
+          <div>
+            <label style={{ fontSize: "0.75rem", color: "var(--dim)" }}>Shadow Trait</label>
+            <select className="scroll-input" value={player.shadowTrait || ""} onChange={e => handleChange("shadowTrait", e.target.value)}>
+              <option value="">-- Select Shadow Trait --</option>
+              {SHADOW_TRAITS[pClass].map(s => <option key={s.name} value={s.name}>{s.name}</option>)}
+            </select>
+            {player.shadowTrait && (
+              <div style={{ fontSize: "0.75rem", color: "var(--red)", marginTop: "4px" }}>
+                {SHADOW_TRAITS[pClass].find(s => s.name === player.shadowTrait)?.desc}
+              </div>
+            )}
+          </div>
+
+          {/* Destiny Thread */}
+          <div>
+            <label style={{ fontSize: "0.75rem", color: "var(--dim)" }}>Destiny Thread</label>
+            <select className="scroll-input" value={player.destiny || ""} onChange={e => handleChange("destiny", e.target.value)}>
+              <option value="">-- Select Destiny Thread --</option>
+              {DESTINY_THREADS[pClass].map((d, i) => (
+                <option key={i} value={d.thread}>{d.thread.substring(0, 40)}...</option>
+              ))}
+            </select>
+            {player.destiny && (
+              <div style={{ fontSize: "0.8rem", color: "var(--purple-light)", marginTop: "6px", fontStyle: "italic", borderLeft: "2px solid var(--purple)", paddingLeft: "8px" }}>
+                "{player.destiny}"
+              </div>
+            )}
+          </div>
+
+        </div>
+      )}
+    </div>
+  );
+};
+
 };
 
 /* ── PLAYER DETAIL MODAL ── */
@@ -3020,6 +3136,7 @@ return (
 {p.destinyThread && <div className=“info-bar” style={{marginBottom:8,borderColor:“rgba(156,39,176,0.4)”,background:“rgba(156,39,176,0.06)”}}><b>Destiny Thread:</b> {p.destinyThread}</div>}
 {p.repPassive && <div className="info-bar" style={{marginBottom:8}}><b>Reputation Passive:</b> {p.repPassive}</div>}
 {p.notes && <div style={{fontFamily:”‘IM Fell English’,serif”,fontStyle:“italic”,fontSize:“0.7rem”,color:“var(–parch-shadow)”,marginBottom:12}}>{p.notes}</div>}
+<PlayerLoreTab player={p} setPlayers={setPlayers} />
 <div className="rune-divider"><span>Inventory</span></div>
 {(!p.inventory||p.inventory.length===0) && <div className="empty-state" style={{padding:12}}>No items.</div>}
 {(p.inventory||[]).map((item,i)=>(
