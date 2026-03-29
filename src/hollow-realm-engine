@@ -602,11 +602,187 @@ const WORLD_LOCATIONS = [
 {id:“library”,name:“The Sunken Library”,short:“Library”,icon:“📚”,color:”#1565c0”,x:64,y:68,danger:2,desc:“Partially submerged. Still functional. Still sinking.”,features:[“Scholar cases throughout readable levels”,“The Sink in flooded lower levels”,“Restricted archive”,“Research desks surface occasionally”],connectedTo:[“kingdom”,“caverns”,“edge”]}
 ];
 
+const WORLD_NPCS = {
+  "Voss, the Ash-Peddler": {
+    name: "Voss", title: "The Ash-Peddler", icon: "🌪️", region: "The Hollow's Edge", danger: 5,
+    role: "Mythic Merchant", color: "#ce93d8",
+    quote: "The void demands equivalent exchange. Coins, blood, and memory.",
+    lore: "A Dust-Walker who has been out on the Edge so long he barely speaks in full sentences. He sits cross-legged in the ash, completely unbothered by the static that shreds reality around him.",
+    sensory: "Smells of ozone and burnt hair. His eyes glow a blinding violet. The sound of reality cracking faintly echoes when he breathes.",
+    spawn: "Requires a Tracking 16+ check to locate his camp in the ash storm, Failure attracts a Wandering Null-Spawn instead.",
+    interaction: "Does not bargain. The price is the price. Refuses to speak to anyone carrying a cursed item.",
+    inventory: [
+      { item: "Pure Void-Essence (Full Heal, applies minor curse)", cost: "2,000c", chance: "100%" },
+      { item: "Random Rare Weapon", cost: "5,000c", chance: "100%" },
+      { item: "Shard of the First Collapse (Adaptive Mythic)", cost: "25k + 1 Legendary + 1 Max HP", chance: "Limit 1 per Arc" }
+    ]
+  },
+  "Quartermaster Rudge": {
+    name: "Rudge", title: "Quartermaster", icon: "🛡️", region: "Crumbling Kingdom", danger: 2,
+    role: "Standard Merchant", color: "#66bb6a",
+    quote: "Show your Kingdom identification, or pay the outlander tax.",
+    lore: "A Garrison-Born operating out of a half-collapsed toll booth. He still follows Kingdom protocol strictly, even though the empire has been dead for centuries.",
+    sensory: "Smells of polished iron, old leather, and stale ration biscuits. He is constantly, rhythmically sharpening a blade.",
+    spawn: "Always present at the Kingdom Gates. Very safe to visit.",
+    interaction: "Grants a 10% discount to Garrison-Born players. Dislikes Dust-Walkers.",
+    inventory: [
+      { item: "Standard Rations & Basic Whetstones", cost: "150c", chance: "100%" },
+      { item: "Common/Uncommon Garrison Gear", cost: "500c - 1,500c", chance: "100%" },
+      { item: "Random Rare Weapon found in rubble", cost: "4,000c", chance: "10% (Roll 19-20)" }
+    ]
+  },
+  "Nylah the Dredge": {
+    name: "Nylah", title: "The Dredge", icon: "💧", region: "Sunken Library", danger: 2,
+    role: "Arcane Merchant", color: "#4fc3f7",
+    quote: "The water keeps the best secrets. I just fetch them.",
+    lore: "A Sunken who uses her amphibious traits to dive into the flooded lower levels and bring up sealed lockboxes. She lays her wet, dripping inventory out on a cracked marble table.",
+    sensory: "Everything she wears is soaked. Smells strongly of old paper, algae, and deep, stagnant water.",
+    spawn: "Always present on the upper grand balconies.",
+    interaction: "Highly suspicious. Will not sell rare items to players with low reputation or known thieves.",
+    inventory: [
+      { item: "Antidotes & Focus Crystals", cost: "300c", chance: "100%" },
+      { item: "Uncommon Grimoires & Stilettos", cost: "1,200c", chance: "100%" },
+      { item: "Legendary Lore Fragment or Focus", cost: "10,000c", chance: "5% (Roll 20)" }
+    ]
+  },
+  "Sister Vex": {
+    name: "Sister Vex", title: "The Purifier", icon: "✨", region: "Dark Enchanted Forest", danger: 3,
+    role: "Curse Breaker", color: "#ff9800",
+    quote: "Do not bring that filth into my chapel unless you are ready to bleed for it.",
+    lore: "An exiled Healer who set up a sanctuary in a ruined forest chapel. She is the only one on the map who can safely extract Void Infections from looted items.",
+    sensory: "The smell of burning sage is overpowering. She hums a low, resonant hymn that vibrates in your teeth.",
+    spawn: "The chapel is hidden. Requires a minor offering of blood at the treeline to reveal the path.",
+    interaction: "Refuses coins for purification. Trades only in 'Life Echoes'.",
+    inventory: [
+      { item: "Aether Bandages (Heals 3 HP, cures bleed)", cost: "250c", chance: "100%" },
+      { item: "Holy Salt (Wards an area for 1 rest)", cost: "500c", chance: "100%" },
+      { item: "Purify Void Infection from Item", cost: "-1 Temp Stat Debuff or 1 Max HP", chance: "Always" }
+    ]
+  },
+  "Krell the Foreman": {
+    name: "Krell", title: "The Bedrock Foreman", icon: "⛏️", region: "Underground Caverns", danger: 3,
+    role: "Master Smith", color: "#ffb300",
+    quote: "The mountain don't care about your stories. It only cares about the weight of your swing.",
+    lore: "Krell was the lead excavation officer when the Shift happened. He refused to abandon the deep veins, staying behind to protect the Hollow Ore deposits. Over decades, the raw ore has literally begun to replace his skin. He is the only being in the realm who knows how to fold Hollow Ore into existing weapons without shattering them.",
+    sensory: "Smells of sulfur, wet stone, and hot iron. His voice sounds like two tectonic plates grinding together. When he moves, you hear the heavy clank-thud of metal boots and the hiss of a portable steam-forge strapped to his back.",
+    spawn: "Requires a Perception 12+ check to hear his rhythmic hammering through the cavern walls. If the Squad is carrying more than 5x Hollow Ore, Krell will find them.",
+    interaction: "Values effort. Gives a 20% discount to players presenting 'Worn' or 'Damaged' weapons. Refuses to work for Aether-Kith (calls them 'cloud-breath').",
+    inventory: [
+      { item: "Hollow Reforge (Permanent +1 ATK to weapon)", cost: "3,000c + 2x Hollow Ore", chance: "Always" },
+      { item: "Shatter-Guard (Weapon can never Break again)", cost: "1,500c + 1x Hollow Ore", chance: "Always" },
+      { item: "Deep-Blast Charge (Consumable: 2d10 Env. DMG)", cost: "800c", chance: "Always" },
+      { item: "Heavy Work Gloves (Passive: +1 STR checks)", cost: "500c", chance: "100%" }
+    ]
+  }
+};
+
 const VILLAIN_LORE = [
-{id:“gravenor”,name:“Gravenor”,title:“The Ashen Alpha”,icon:“🐺”,color:”#9c27b0”,motivation:“Reclaiming something the Hollow took from him.”,lore:“A Warrior stationed at the Forest edge. His unit didn’t come back. He did — changed. Leads the Ashen Pack not by command, but by agreement. Patient in a way that makes him more dangerous than rage.”,strengths:[“Regenerates 2 HP/round in Forest or low-light”,“Cannot be flanked — senses all within 40ft”,“Pack Coordination — wolves +1 when above half HP”,“Standard weapons deal -1 damage”],weaknesses:[“Silver bypasses defences, deals +2”,“Fire — cannot regenerate”,“His honour — cannot pursue formal surrender”],phases:[{phase:1,name:“The Watcher”,hp:“80 HP — Full”,desc:“Observes. Tests player responses. Will speak if approached with respect.”,color:”#4fc3f7”},{phase:2,name:“The Hunter”,hp:“Below 60 HP”,desc:“Engages directly. Targets who did most damage to his pack.”,color:”#ff9800”},{phase:3,name:“The Feral”,hp:“Below 30 HP”,desc:“The man recedes. Reckless, devastating. Pack members scatter.”,color:”#ef5350”}],loot:[{item:“Ashen Fang (Arc weapon material)”,chance:“Phase 2 — 70%”},{item:“Pack Sigil (unlocks Ashen Pack faction)”,chance:“Phase 3 — 50%”},{item:“Gravenor’s Scar (cosmetic mark)”,chance:“Combat completion — 100%”}]},
-{id:“valdris”,name:“Valdris”,title:“The Chancellor of Ruins”,icon:“🏰”,color:”#c62828”,motivation:“Restoring the Kingdom to its former glory by any means necessary.”,lore:“Was a mid-ranking scribe before the Kingdom fell. He didn’t die — he adapted. Now rules the throne room of the ruined palace, convinced he is the legitimate heir to an empire that has been dead for centuries.”,strengths:[“Kingdom terrain mastery — +2 all rolls in ruins”,“Garrison loyalty — calls 2d4 soldier reinforcements once/fight”,“Vault Key — can seal rooms remotely”,“Iron Will — immune to fear and social manipulation”],weaknesses:[“Isolated — no allies outside the Kingdom”,“The Records — his actual lineage disproves his claim”,“Direct honesty — cannot process sincere diplomacy; it breaks his worldview”],phases:[{phase:1,name:“The Authority”,hp:“60 HP”,desc:“Commands. Uses soldiers as shields. Will parley from a position of false power.”,color:”#4fc3f7”},{phase:2,name:“The Desperate”,hp:“Below 35 HP”,desc:“Abandons strategy. Personal combat. Seals exits.”,color:”#ef5350”}],loot:[{item:“Chancellor Ring (opens Kingdom Vault)”,chance:“Defeat — 100%”},{item:“Kingdom Signet (faction access)”,chance:“Defeat — 100%”},{item:“Ruined Crown (cosmetic, Legendary)”,chance:“Parley success — 30%”}]},
-{id:“thessaly”,name:“Thessaly”,title:“The Architect of the Deep”,icon:“⛏️”,color:”#6a1b9a”,motivation:“Mapping and ultimately controlling the entire Cavern system.”,lore:“A former Rogue who discovered the Caverns weren’t natural. She has spent years placing traps, cataloguing creatures, and negotiating with things in the deep that have no names. She knows every inch of the underground.”,strengths:[“Home terrain — +3 all rolls in Caverns”,“Trap Mastery — every room has at least one trap players don’t know about”,“Creature Accord — can call cave entities”,“Darkness dependency — functions at full capacity in complete dark”],weaknesses:[“Zero combat ability in direct light (sunlight negates all bonuses)”,“The Map — she needs it. If players have pieces of it she’s looking for them”,“Trust — she respects competence. A sufficiently skilled party can negotiate”],phases:[{phase:1,name:“The Observer”,hp:“55 HP”,desc:“Watches through her trap network. Won’t engage directly unless cornered.”,color:”#4fc3f7”},{phase:2,name:“The Architect”,hp:“Below 30 HP”,desc:“Full trap activation. Environment becomes hostile. Personal combat only as last resort.”,color:”#9c27b0”}],loot:[{item:“Master Cavern Map fragment”,chance:“Phase 2 — 80%”},{item:“Thessaly’s Lockpick Set (Rare tool)”,chance:“Non-lethal resolution — 60%”},{item:“Deep Accord Sigil (Cavern creatures neutral)”,chance:“Negotiation success — 100%”}]},
+  {
+    id: "gravenor", name: "Gravenor", title: "The Hollow's Hound - Alpha of the Ashen Pack",
+    type: "Werewolf Arc Boss", arc: "Arc I - The Ashen Hunt",
+    location: "Dark Enchanted Forest", threat: "Extreme", color: "#9c27b0", icon: "🐺",
+    tagline: "He was a man once. The Hollow made him something more useful.",
+    lore: "Gravenor was a Warrior stationed at the Forest edge. His unit did not come back. He did. Whatever the Hollow did to him, it kept something - the planning, the memory, the grudges. He leads the Ashen Pack not by command but by agreement. He is not cruel. He is not simple. He is patient in a way that makes him more dangerous than either.",
+    motivation: "Reclaiming something the Hollow took from him. The players are obstacles, witnesses, or occasionally tools depending on what they have done.",
+    strengths: ["Regenerates 2 HP/round in Forest or low-light", "Cannot be flanked - senses all within 40 feet", "Pack Coordination - wolves gain +1 when he is above half HP", "Hollow-Hardened - standard weapons deal -1 damage", "Tracking - once scented, can find anywhere in Forest", "Intimidation Aura - characters at 3 HP must roll WIS 12+ to act aggressively"],
+    weaknesses: ["Silver - bypasses Hollow-Hardened and deals +2", "Fire - cannot regenerate when fire damage received", "His honour - cannot pursue formal surrender", "Daylight on open ground - -1 all rolls", "The thing he lost - if present or named, loses one action"],
+    phases: [
+      { phase: 1, name: "The Watcher", hp: "Full - 80 HP", desc: "Observes. Tests player responses. Will speak if approached with respect.", color: "#4fc3f7" },
+      { phase: 2, name: "The Hunter", hp: "Below 60 HP", desc: "Engages directly. Targets who did most damage to his pack. Precise, tactical.", color: "#ff9800" },
+      { phase: 3, name: "The Feral", hp: "Below 30 HP", desc: "The man recedes. Reckless, devastating. Pack members scatter.", color: "#ef5350" },
+      { phase: 4, name: "The Reckoning", hp: "At 0 HP", desc: "Collapses. The man surfaces. One round of lucidity. He speaks. What he says is arc-relevant.", color: "#ce93d8" }
+    ],
+    loot: [
+      { item: "Ashen Fang (weapon enchantment)", chance: "65%" },
+      { item: "Pack Sigil (faction key)", chance: "80%" },
+      { item: "Hollow-Touched Pelt", chance: "45%" },
+      { item: "Gravenor's Memory (arc item)", chance: "Phase 4 only - 100%" }
+    ]
+  },
+  {
+    id: "valdris", name: "Valdris the Unmourned", title: "Last Chancellor of the Crumbling Kingdom",
+    type: "Undead Political Villain - Arc Boss", arc: "Arc II - The Kingdom's Debt",
+    location: "Crumbling Kingdom throne room", threat: "High", color: "#ef5350", icon: "👑",
+    tagline: "The Kingdom fell. He did not have the decency to go with it.",
+    lore: "Valdris did not cause the Kingdom collapse. He facilitated it. He spent his chancellorship building leverage - favours, secrets, alliances that looked like loyalty and functioned like ownership. When collapse came, he had prepared an exit that required sacrificing every connection he had spent a career building. He made the trades. They worked. Then the Hollow noticed the accounting. He has been in the throne room since. Unable to leave. Unable to die. Unable to settle what he owes.",
+    motivation: "He wants out. Settling his debts legitimately would cost him everything. He is actively recruiting others to transfer the debts to instead.",
+    strengths: ["Political Intelligence - knows leverage on every faction", "Immune to damage inside throne room", "Debt Transfer - applies Debt consequence to those who accept his deals", "Undying - cannot be permanently killed until debts settled", "Plausible Deniability - CHA 15+ required to accuse him"],
+    weaknesses: ["Outside Kingdom ruins - powers significantly reduced", "His debts - returning items to specific people weakens him permanently", "Cannot lie outright - only mislead", "He needs the players - without someone to transfer debt to, he is stuck"],
+    phases: [
+      { phase: 1, name: "The Chancellor", hp: "Full - 60 HP", desc: "Diplomatic. Charming. Genuinely helpful selectively. Building trust to spend later.", color: "#4fc3f7" },
+      { phase: 2, name: "The Negotiator", hp: "Below 45 HP", desc: "Desperation shows. Offers improve. Costs worsen. Sets players against each other.", color: "#ff9800" },
+      { phase: 3, name: "The Unmourned", hp: "Below 20 HP", desc: "Drops the facade. Uses every piece of leverage simultaneously.", color: "#ef5350" }
+    ],
+    loot: [
+      { item: "Kingdom Vault Key", chance: "75%" },
+      { item: "Debt Ledger", chance: "60%" },
+      { item: "Chancellor's Ring", chance: "40%" },
+      { item: "Kingdom Signet", chance: "55%" }
+    ]
+  },
+  {
+    id: "sink", name: "The Sink", title: "What Lives at the Bottom of the Sunken Library",
+    type: "Entity - Unknown Classification", arc: "Arc III - The Drowned Archive",
+    location: "Sunken Library permanently submerged lowest level", threat: "Unknown", color: "#4fc3f7", icon: "🌊",
+    tagline: "It did not sink the Library. It was why the Library was built there.",
+    lore: "The Sunken Library was built on this location because of what was already here. The founders believed proximity to The Sink made knowledge more accessible. They were correct. Nobody has confirmed what the original negotiation cost. The record is in the flooded sections.",
+    motivation: "Unknown. Possibly not goal-oriented in ways that translate to motivation. The working theory is that it is absorbing the knowledge in the drowned sections as the water rises.",
+    strengths: ["Omniscience (partial) - knows everything in drowned sections", "Water domain - all enemy rolls -2 in flooded areas", "The Pull - WIS 12+ each round in deep water or drift deeper", "Cannot be damaged by conventional means in deep water", "Information Weapon - can reveal Shadow Traits and Destiny Threads"],
+    weaknesses: ["Surface power significantly reduced above water", "Light - sustained magical light reduces The Pull by half", "Direct questions - it answers them. Always. The answers are true.", "The founding documents describe a counter-condition"],
+    phases: [
+      { phase: 1, name: "The Archive", hp: "Inapplicable", desc: "Passive. Provides information freely to any character who asks.", color: "#4fc3f7" },
+      { phase: 2, name: "The Collector", hp: "100 HP (partial emergence)", desc: "Responds to characters reaching deep levels. The Pull intensifies. Characters feel themselves being read.", color: "#9c27b0" },
+      { phase: 3, name: "The Answer", hp: "Cannot be killed - only recedes", desc: "Direct confrontation. Asks one question of each character about their Destiny Thread.", color: "#ce93d8" }
+    ],
+    loot: [
+      { item: "Drowned Archive fragment", chance: "70%" },
+      { item: "Founding Document (arc key)", chance: "40%" },
+      { item: "Waterlogged Enchantment Scroll", chance: "35%" }
+    ]
+  },
+  {
+    id: "thessaly", name: "Thessaly Vane", title: "The Burned Cartographer",
+    type: "Human Villain - Recurring", arc: "Arc IV - The Unmapped",
+    location: "Underground Caverns - deep unmapped sections", threat: "High", color: "#ff9800", icon: "🔥",
+    tagline: "She mapped the Hollow Realm. Then she started making changes.",
+    lore: "Thessaly was the Hollow Realm's foremost cartographer before she went underground and stopped coming back up. Her maps are used by every faction. The early work stopped a few years ago. What she has been making since is different maps that describe changes she made to the Hollow itself. The changes are real. The Hollow has not stopped her.",
+    motivation: "She believes the Hollow is broken and she can fix it. She is correct about the first part. Her fix has side effects she has not fully accounted for, and she knows this.",
+    strengths: ["Environmental Mastery - knows Caverns completely, +3 terrain use", "Remapping - can alter Cavern layout between sessions", "Trap Network - every corridor she controls has one trap", "Precision - called shots bypass armour on 17+"],
+    weaknesses: ["Above ground - loses advantage completely", "Her maps - if players obtain one they have her plans", "The burn - her right hand. Fire damage causes additional -1 to next action", "She wants someone to understand and agree it is worth it"],
+    phases: [
+      { phase: 1, name: "The Guide", hp: "Full - 70 HP", desc: "Presents as a resource. Genuinely helpful. Her help always serves her project.", color: "#4fc3f7" },
+      { phase: 2, name: "The Architect", hp: "Below 50 HP", desc: "Players have figured it out. She stops pretending and starts explaining.", color: "#ff9800" },
+      { phase: 3, name: "The Burned", hp: "Below 25 HP", desc: "Project near completion. Cannot be stopped by conventional means.", color: "#ef5350" }
+    ],
+    loot: [
+      { item: "Master Cavern Map", chance: "85%" },
+      { item: "Burnt Cartographer Tools", chance: "60%" },
+      { item: "Project Blueprint", chance: "55%" },
+      { item: "Hollow Anchor material", chance: "35%" }
+    ]
+  },
+  {
+    id: "warden", name: "The Null Warden", title: "Keeper of the Hollow's Edge",
+    type: "Entity - Environmental Boss", arc: "Arc V - The Edge",
+    location: "The Hollow's Edge exclusively", threat: "Absolute within domain", color: "#ce93d8", icon: "👁️",
+    tagline: "It does not guard the Edge to keep things out. It guards it to keep things in.",
+    lore: "The Null Warden holds the boundary between the Hollow and whatever exists beyond it. Before its arrival, things moved between the Hollow and the beyond without restriction. The Warden established current boundary conditions. The Hollow retained its character. The beyond retained its character. The interaction became regulated.",
+    motivation: "Maintains the boundary. Whether it has motivations beyond this in ways players can engage with through normal means is unclear. It has helped characters working to stabilise the Edge and impeded characters unknowingly contributing to destabilisation.",
+    strengths: ["Domain absolute - cannot be defeated within Edge, only negotiated with", "Null field - all magical effects suppressed in direct proximity", "Patience - operates on timescales that make sessions irrelevant", "The boundary itself - can make characters partially intangible", "Cannot be surprised"],
+    weaknesses: ["Away from Edge - power diminishes significantly", "Direct questions - answered directly", "Characters who genuinely understand the boundary are treated differently", "Commitment - if players formally commit to stabilising, it becomes an ally"],
+    phases: [
+      { phase: 1, name: "The Boundary", hp: "Environmental", desc: "Players feel it as directional wrongness. Observes. Does not interfere.", color: "#7b6fa0" },
+      { phase: 2, name: "The Warden", hp: "150 HP - Edge only", desc: "Tests each character. The test relates to their Shadow Trait or Destiny Thread.", color: "#9c27b0" },
+      { phase: 3, name: "The Keeper", hp: "Becomes a character", desc: "If players engaged honestly, meets them as a communicative presence. Negotiation about the boundary's future.", color: "#ce93d8" }
+    ],
+    loot: [
+      { item: "Edge Fragment (mythic material)", chance: "Phase 2 pass - 60%" },
+      { item: "Boundary Access (consequence)", chance: "Phase 2 pass - 100%" },
+      { item: "The Record's Summary", chance: "Phase 3 - 100%" }
+    ]
+  }
 ];
+
 
 const CLASS_LORE = {
 Warrior:{tagline:“They showed up when things were falling apart. They haven’t left.”,overview:“Warriors in the Hollow Realm are defined by persistence more than power. They are the ones who were still standing when everything else stopped.”,strengths:[“Highest HP (12) — takes punishment that destroys others”,“Natural protector — Gift Power shields allies from damage”,“DEF 7 — most durable in sustained combat”,“Intimidation baseline — NPCs defer in tense situations”],weaknesses:[“INT 3 — magical challenges are hard”,“Social finesse is limited — blunt by default”,“Dependent on allies for healing”],giftPower:“Shield Block — Absorb incoming damage for an ally. Completely. Once per session. No roll required.”,playstyle:“Warriors anchor the party. They take the hit, hold the line, buy time.”,lore:“In the Kingdom records, Warriors appear in every account of catastrophe. Not as heroes — as the last ones out.”},
