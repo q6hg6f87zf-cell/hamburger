@@ -32,6 +32,381 @@ Healer:{STR:3,DEF:4,INT:6,WIS:9,SPD:4,CHA:7,LCK:5},
 Merchant:{STR:3,DEF:3,INT:6,WIS:5,SPD:5,CHA:8,LCK:8},
 Bard:{STR:3,DEF:2,INT:5,WIS:6,SPD:6,CHA:10,LCK:5}
 };
+const REP = {
+  Warrior: [
+    { r: [1, 1], title: "The Broken Shield", passive: "-1 first combat roll/session." },
+    { r: [2, 2], title: "The Deserter", passive: "Cannot call authority back. +1 solo stealth." },
+    { r: [3, 3], title: "The Cursed Blade", passive: "First weapon roll/arc disadvantaged." },
+    { r: [4, 4], title: "The Unfinished War", passive: "+1 intimidation. -1 social with nobility." },
+    { r: [5, 7], title: "The Steadfast", passive: "Allies nearby cannot be coerced." },
+    { r: [8, 9], title: "The Iron Wall", passive: "+1 DEF when protecting another character." },
+    { r: [10, 11], title: "The Oathkeeper", passive: "Declare an oath once/session. +2 if kept." },
+    { r: [12, 13], title: "The Last Line", passive: "+2 combat at 3 HP or below." },
+    { r: [14, 14], title: "The Hollow's Bulwark", passive: "Immune to first curse each arc." },
+    { r: [15, 16], title: "The Undying", passive: "If dying, roll d20. 10+ = survive at 1 HP." },
+    { r: [17, 18], title: "The Warlord of Ash", passive: "Can command allies. 15+ roll they obey." },
+    { r: [19, 19], title: "The Unkillable", passive: "+1 all combat. Hostiles must target others first." },
+    { r: [20, 20], title: "THE HOLLOW'S CHAMPION", passive: "Once/arc, call on The Hollow for automatic success." }
+  ],
+  Wizard: [
+    { r: [1, 1], title: "The Silenced", passive: "First spell/session: d6, 1-2 backfire." },
+    { r: [2, 2], title: "The Forbidden Scholar", passive: "+2 INT, -1 WIS. Access to restricted knowledge." },
+    { r: [3, 3], title: "The Unstable", passive: "On fumble, spell affects random target." },
+    { r: [4, 4], title: "The Once-Great", passive: "-1 spell rolls but +2 in academic settings." },
+    { r: [5, 7], title: "The Theorist", passive: "+1 puzzle-solving and knowledge rolls." },
+    { r: [8, 9], title: "The Practical Caster", passive: "Cast minor spells without a roll." },
+    { r: [10, 11], title: "The Arcanist", passive: "+1 all INT. Arcane locks open without a roll." },
+    { r: [12, 13], title: "The Seeker", passive: "Once/session, ask DM one question answered truthfully." },
+    { r: [14, 14], title: "The Hollow's Eye", passive: "+2 detecting illusions, hidden paths, Hollow entities." },
+    { r: [15, 16], title: "The Void Speaker", passive: "Once/arc, attempt communication with any entity." },
+    { r: [17, 18], title: "The Architect of Ruin", passive: "+2 area-effect and destructive spells." },
+    { r: [19, 19], title: "The Worldbreaker", passive: "+2 all spells. Average-INT NPCs fear them." },
+    { r: [20, 20], title: "THE HOLLOW'S ORACLE", passive: "Once/arc, DM must give one true future event." }
+  ],
+  Rogue: [
+    { r: [1, 1], title: "The Marked", passive: "Once/session an NPC may recognise them." },
+    { r: [2, 2], title: "The Burned Informant", passive: "-1 trust rolls. +1 solo stealth." },
+    { r: [3, 3], title: "The Clumsy Thief", passive: "First theft/session: roll d6. 1-2 caught." },
+    { r: [4, 4], title: "The Wanted", passive: "Faction is actively looking for them." },
+    { r: [5, 7], title: "The Shadow", passive: "+1 stealth in urban environments." },
+    { r: [8, 9], title: "The Grifter", passive: "+1 deception. NPCs believe first lie automatically." },
+    { r: [10, 11], title: "The Ghost", passive: "Leave no trace unless rolling 1-3." },
+    { r: [12, 13], title: "The Contractor", passive: "Once/arc, name a price for a dangerous task. NPC pays." },
+    { r: [14, 14], title: "The Hollow's Shadow", passive: "+2 all stealth in Hollow locations." },
+    { r: [15, 16], title: "The Phantom", passive: "Cannot be detected by mundane means in darkness." },
+    { r: [17, 18], title: "The Ghost Contract", passive: "Once/arc, complete one action with no roll required." },
+    { r: [19, 19], title: "The Unseen Hand", passive: "Others take blame for their actions unless witnessed." },
+    { r: [20, 20], title: "THE HOLLOW'S KNIFE", passive: "Once/arc, any action succeeds. No roll. No consequence." }
+  ],
+  Healer: [
+    { r: [1, 1], title: "The Burnout", passive: "First heal/session costs 1 HP from themselves." },
+    { r: [2, 2], title: "The Doubted", passive: "-1 trust with strangers. +2 with those they've saved." },
+    { r: [3, 3], title: "The Rattled", passive: "In combat, healing rolls -1 until they take damage." },
+    { r: [4, 4], title: "The Haunted", passive: "Has lost someone. -1 in situations that mirror the loss." },
+    { r: [5, 7], title: "The Field Medic", passive: "+1 stabilising downed characters." },
+    { r: [8, 9], title: "The Trusted", passive: "NPCs in need seek them out. +1 social in distress situations." },
+    { r: [10, 11], title: "The Keeper", passive: "Once/session, prevent a character from going below 1 HP." },
+    { r: [12, 13], title: "The Order's Voice", passive: "Healing Order NPCs offer resources without cost." },
+    { r: [14, 14], title: "The Hollow's Hands", passive: "+2 all healing in Hollow locations." },
+    { r: [15, 16], title: "The Saint", passive: "Once/arc, full heal any character. No roll." },
+    { r: [17, 18], title: "The Death's Edge", passive: "Can attempt revival of dead characters. 15+ to succeed." },
+    { r: [19, 19], title: "The Miracle", passive: "Once/arc, any healing roll automatically succeeds at max." },
+    { r: [20, 20], title: "THE HOLLOW'S GRACE", passive: "Once/arc, reverse a death that occurred this session." }
+  ],
+  Merchant: [
+    { r: [1, 1], title: "The Debtor", passive: "Owes someone. DM holds the debt." },
+    { r: [2, 2], title: "The Fraudster", passive: "+1 deception but -2 with guilds if exposed." },
+    { r: [3, 3], title: "The Undercut", passive: "First trade/session: rival appears with better offer." },
+    { r: [4, 4], title: "The Blacklisted", passive: "One major faction refuses to deal with them." },
+    { r: [5, 7], title: "The Traveller", passive: "+1 to finding rare goods in new locations." },
+    { r: [8, 9], title: "The Negotiator", passive: "+1 all trade and negotiation rolls." },
+    { r: [10, 11], title: "The Connected", passive: "In any location, knows one useful NPC." },
+    { r: [12, 13], title: "The Broker", passive: "Once/session, create a deal between two NPCs." },
+    { r: [14, 14], title: "The Hollow's Coin", passive: "+2 all transactions in Hollow locations." },
+    { r: [15, 16], title: "The Kingmaker", passive: "Once/arc, elevate or ruin one NPC's status." },
+    { r: [17, 18], title: "The Cartel", passive: "Controls prices in one location. +3 all rolls there." },
+    { r: [19, 19], title: "The Exchange", passive: "Once/arc, trade any item for any item at equal value." },
+    { r: [20, 20], title: "THE HOLLOW'S PRICE", passive: "Once/arc, name a price for anything. NPC pays it." }
+  ],
+  Bard: [
+    { r: [1, 1], title: "The Heckled", passive: "First performance/session: audience hostile on 1-3." },
+    { r: [2, 2], title: "The One-Hit", passive: "-1 repeat performances with the same audience." },
+    { r: [3, 3], title: "The Plagiarist", passive: "+1 copying others' styles. -2 if exposed." },
+    { r: [4, 4], title: "The Forgotten", passive: "NPCs don't remember their name without prompting." },
+    { r: [5, 7], title: "The Entertainer", passive: "+1 first performance in any new location." },
+    { r: [8, 9], title: "The Crowd-Reader", passive: "+1 mass persuasion and performance rolls." },
+    { r: [10, 11], title: "The Storyteller", passive: "Once/session, reframe a situation with a story. +2 result." },
+    { r: [12, 13], title: "The Court Favourite", passive: "Noble NPCs grant access and favours." },
+    { r: [14, 14], title: "The Hollow's Voice", passive: "+2 performances in Hollow locations. Hollow responds." },
+    { r: [15, 16], title: "The Legend", passive: "Once/arc, performance reaches any audience regardless of distance." },
+    { r: [17, 18], title: "The Memory", passive: "Stories they tell become permanent NPC memories." },
+    { r: [19, 19], title: "The Epoch", passive: "Once/arc, performance changes faction attitudes permanently." },
+    { r: [20, 20], title: "THE HOLLOW'S SONG", passive: "Once/arc, perform something the Hollow remembers forever." }
+  ]
+};
+
+const SIGNATURE_SKILLS = {
+  Warrior: [
+    { r: [1, 2], name: "Reckless Charge", desc: "-1 DEF, +2 first attack roll each session." },
+    { r: [3, 4], name: "Broken Form", desc: "Unpredictable style. +1 to surprise strikes." },
+    { r: [5, 6], name: "Shield Wall", desc: "Allies behind them get +1 DEF while stationary." },
+    { r: [7, 8], name: "Weapon Read", desc: "+1 to all rolls against same enemy after first exchange." },
+    { r: [9, 10], name: "War Cry", desc: "Once/session, enemy NPC must roll to act against them next turn." },
+    { r: [11, 12], name: "Controlled Aggression", desc: "+2 to first strike after spending a full turn observing." },
+    { r: [13, 14], name: "Endurance Fighter", desc: "In extended conflicts, gains +1 each subsequent round." },
+    { r: [15, 16], name: "Execution Strike", desc: "+3 attack against any enemy below half HP." },
+    { r: [17, 18], name: "Counter", desc: "When an attack fails against them, rolls a free response strike." },
+    { r: [19, 19], name: "Battlefield Commander", desc: "Once/session, every allied player gets +1 to their next roll." },
+    { r: [20, 20], name: "THE HOLLOW'S BLADE", desc: "UNIQUE. On a Critical, the effect lingers into next session." }
+  ],
+  Wizard: [
+    { r: [1, 2], name: "Volatile Casting", desc: "Spells hit harder but 1-in-6 chance of unexpected side effect." },
+    { r: [3, 4], name: "Forbidden Indexing", desc: "Can attempt any knowledge roll regardless of subject." },
+    { r: [5, 6], name: "Spell Dampening", desc: "Reduce an incoming magical effect by half. Once/session." },
+    { r: [7, 8], name: "Rune Reading", desc: "+2 to deciphering magical inscriptions and Hollow markings." },
+    { r: [9, 10], name: "Projection", desc: "Cast a minor illusion without a roll. Once/session." },
+    { r: [11, 12], name: "Arcane Diagnosis", desc: "Touch something and identify any magical effect on it. No roll." },
+    { r: [13, 14], name: "Counter-Spell", desc: "When enemy spell cast, attempt to interrupt. Roll INT vs difficulty." },
+    { r: [15, 16], name: "Hollow Channelling", desc: "Once/arc, cast a spell beyond normal tier." },
+    { r: [17, 18], name: "Memory Casting", desc: "Replicate any spell witnessed once before. +1 to replicated spells." },
+    { r: [19, 19], name: "The Eye", desc: "See through one illusion, deception, or hidden thing per session." },
+    { r: [20, 20], name: "THE HOLLOW'S TONGUE", desc: "UNIQUE. Once/arc, ask the Hollow anything. DM must answer truthfully." }
+  ],
+  Rogue: [
+    { r: [1, 2], name: "Pickpocketing", desc: "Lift small items on SPD roll. Fail means they notice." },
+    { r: [3, 4], name: "Lock Reading", desc: "Identify any lock mechanism in 30 seconds. +2 lockpicking." },
+    { r: [5, 6], name: "Forgery", desc: "Produce convincing false documents. CHA roll to use them." },
+    { r: [7, 8], name: "Tailing", desc: "Follow a target without detection. Roll only if actively watched." },
+    { r: [9, 10], name: "Disguise", desc: "Assume different identity. +2 CHA while in disguise." },
+    { r: [11, 12], name: "Poison Craft", desc: "Apply contact poison to any item. Effect negotiated with DM." },
+    { r: [13, 14], name: "Escape Artist", desc: "Cannot be restrained for more than one round without SPD roll." },
+    { r: [15, 16], name: "Rooftop Navigation", desc: "Full speed across vertical terrain. No penalty rolls." },
+    { r: [17, 18], name: "Dead Drop Network", desc: "Once/arc, retrieve useful intel from a hidden cache." },
+    { r: [19, 19], name: "Ghost Entry", desc: "Enter any non-magical location without a roll. Leaves no trace." },
+    { r: [20, 20], name: "THE HOLLOW'S SHADOW", desc: "UNIQUE. Becomes functionally invisible for one full scene/arc." }
+  ],
+  Healer: [
+    { r: [1, 2], name: "Field Stitching", desc: "Stabilise any wound without materials. Buys two rounds." },
+    { r: [3, 4], name: "Poison Identification", desc: "Identify any toxin by sight or smell. +2 treating poisoned." },
+    { r: [5, 6], name: "Psychic First Aid", desc: "Treat mental trauma, fear, and psychological status effects." },
+    { r: [7, 8], name: "Curse Reading", desc: "Identify nature and source of any curse on contact." },
+    { r: [9, 10], name: "Pain Management", desc: "Suppress injury penalty for one session. Damage still exists." },
+    { r: [11, 12], name: "Emergency Revival", desc: "Bring downed character to consciousness. One action, no roll, once/session." },
+    { r: [13, 14], name: "Herbal Synthesis", desc: "Create a restorative item from available materials. Once/location." },
+    { r: [15, 16], name: "Hollow Medicine", desc: "Treatments in Hollow locations have doubled effect." },
+    { r: [17, 18], name: "Death Diagnosis", desc: "Determine cause and time of death from a body with complete accuracy." },
+    { r: [19, 19], name: "Vital Read", desc: "By observation alone, know exact HP and conditions of any character." },
+    { r: [20, 20], name: "THE HOLLOW'S HANDS", desc: "UNIQUE. Once/arc, full heal any character instantly." }
+  ],
+  Merchant: [
+    { r: [1, 2], name: "Fast Talk", desc: "Distract or confuse an NPC. Buys one round without a roll." },
+    { r: [3, 4], name: "Counterfeit Detection", desc: "Identify fake currency, forged documents, or fraudulent goods instantly." },
+    { r: [5, 6], name: "Bulk Negotiation", desc: "+2 group trade rolls. Always secures better combined rates." },
+    { r: [7, 8], name: "Market Reading", desc: "Know approximate value and demand of any item. No roll." },
+    { r: [9, 10], name: "Smuggling Routes", desc: "Move restricted goods through any location. Risk roll only at checkpoints." },
+    { r: [11, 12], name: "Credit Network", desc: "Access funds beyond current inventory. Repaid within one arc." },
+    { r: [13, 14], name: "Auction Control", desc: "Control pace and pressure of any bidding situation." },
+    { r: [15, 16], name: "Bribery", desc: "CHA roll to find any NPC price. On success, they cooperate once." },
+    { r: [17, 18], name: "Hollow Arbitrage", desc: "Once/arc, turn a worthless item into something useful." },
+    { r: [19, 19], name: "The Long Game", desc: "Plant an arrangement. It pays off two sessions later without further action." },
+    { r: [20, 20], name: "THE HOLLOW'S PRICE", desc: "UNIQUE. Once/arc, name a price for anything. Any NPC will pay it." }
+  ],
+  Bard: [
+    { r: [1, 2], name: "Crowd Reading", desc: "+2 to all mass persuasion rolls." },
+    { r: [3, 4], name: "Improvisation", desc: "Perform without preparation. No penalty for unexpected situations." },
+    { r: [5, 6], name: "Emotional Manipulation", desc: "Shift one NPC emotion in a chosen direction. CHA roll." },
+    { r: [7, 8], name: "Satire", desc: "Publicly humiliate a target. They lose one social interaction this session." },
+    { r: [9, 10], name: "Lullaby", desc: "Calm one hostile NPC. They cannot attack for one round." },
+    { r: [11, 12], name: "War Song", desc: "All allies gain +1 to their next roll when performed in combat." },
+    { r: [13, 14], name: "The Long Memory", desc: "Recall any piece of lore or history heard before. +3 knowledge rolls." },
+    { r: [15, 16], name: "Hollow Resonance", desc: "In Hollow locations, performance has unpredictable additional effect." },
+    { r: [17, 18], name: "The Turning Song", desc: "Once/session, change the emotional state of an entire room." },
+    { r: [19, 19], name: "The Epic", desc: "Once/arc, tell a story that permanently changes how one faction views a player." },
+    { r: [20, 20], name: "THE HOLLOW'S SONG", desc: "UNIQUE. Once/arc, performance becomes permanent in world memory." }
+  ]
+};
+
+const SHADOW_TRAITS = {
+  Warrior: [
+    { r: [1, 2], name: "The Coward's Scar", desc: "Has run from one fight. Will avoid similar situations. Rolls -1 in matching circumstances." },
+    { r: [3, 4], name: "The Berserker Flaw", desc: "Below 3 HP, must roll WIS 10+ to choose targets. Failure = attack nearest." },
+    { r: [5, 6], name: "The Oath-Breaker", desc: "Broke a vow. One faction knows. -2 with that faction permanently." },
+    { r: [7, 8], name: "The Blood Debt", desc: "Owes a life. The creditor hasn't collected yet." },
+    { r: [9, 10], name: "The Haunted Blade", desc: "Weapon carries a death. Once/arc it reacts unexpectedly." },
+    { r: [11, 12], name: "The War Fatigue", desc: "Extended combat without rest: -1 cumulative per session over 3." },
+    { r: [13, 14], name: "The Fallen Banner", desc: "Their side lost a war. Some factions remember. -1 trust with Kingdom remnants." },
+    { r: [15, 16], name: "The Unnecessary Death", desc: "Someone died because of their choice. DM knows who." },
+    { r: [17, 18], name: "The Pride", desc: "Cannot accept help when at full HP. Must attempt alone first." },
+    { r: [19, 20], name: "The Hollow's Claim", desc: "The Hollow marked them in their worst moment. It is owed a service." }
+  ],
+  Wizard: [
+    { r: [1, 2], name: "The Forbidden Study", desc: "Accessed knowledge they shouldn't. Something knows they know." },
+    { r: [3, 4], name: "The Failed Spell", desc: "A spell went wrong. Someone was hurt. They don't discuss it." },
+    { r: [5, 6], name: "The Dependency", desc: "Relies on an arcane substance. Without it: -1 all rolls after session 2." },
+    { r: [7, 8], name: "The Stolen Research", desc: "Their best work isn't theirs. The original scholar is looking for it." },
+    { r: [9, 10], name: "The Unfinished Experiment", desc: "Left something running. It has been running since. DM decides what." },
+    { r: [11, 12], name: "The Hollow Contact", desc: "Something reached out to them once. They responded. It remembers." },
+    { r: [13, 14], name: "The Broken Equation", desc: "A calculation they can't solve. They keep trying. -1 WIS when it comes up." },
+    { r: [15, 16], name: "The Rival", desc: "Another scholar wants their position. They are more connected." },
+    { r: [17, 18], name: "The Hubris", desc: "Believes their intelligence exempts them from consequence. Once/arc this is wrong." },
+    { r: [19, 20], name: "The Void Conversation", desc: "The Hollow spoke to them directly once. They are not sure if they understood correctly." }
+  ],
+  Rogue: [
+    { r: [1, 2], name: "The Burned Contact", desc: "Sold someone out. They escaped. They know." },
+    { r: [3, 4], name: "The Recognisable Face", desc: "Too well known in one location. -2 stealth there." },
+    { r: [5, 6], name: "The Loose Ledger", desc: "Their name appears in a crime record. Someone has it." },
+    { r: [7, 8], name: "The Unkept Promise", desc: "Failed to deliver something. The client is patient. For now." },
+    { r: [9, 10], name: "The Double Life", desc: "Maintaining two identities. Once/arc, the wrong one surfaces." },
+    { r: [11, 12], name: "The Collateral", desc: "Someone innocent was hurt during a job. They know. The Rogue knows they know." },
+    { r: [13, 14], name: "The Ghost That Talks", desc: "Left a witness alive once. The witness has been talking." },
+    { r: [15, 16], name: "The Hollow's Record", desc: "The Hollow tracked one of their jobs. The record exists somewhere." },
+    { r: [17, 18], name: "The Price on the Head", desc: "A faction has an open contract on them. Amount: unknown." },
+    { r: [19, 20], name: "The Thing They Kept", desc: "Stole something they should have returned. It has significance they haven't understood yet." }
+  ],
+  Healer: [
+    { r: [1, 2], name: "The One They Couldn't Save", desc: "A patient died despite everything. They remember every detail." },
+    { r: [3, 4], name: "The Hollow Debt", desc: "Used something from the Hollow to save a life. The Hollow considers this a transaction." },
+    { r: [5, 6], name: "The Restricted Knowledge", desc: "Knows a healing method the Order forbids. Has used it." },
+    { r: [7, 8], name: "The Mercy Problem", desc: "Once helped someone who later caused harm. They don't know yet." },
+    { r: [9, 10], name: "The Healer's Burnout", desc: "Giving too much. Once/arc, one healing roll automatically fails." },
+    { r: [11, 12], name: "The Forbidden Patient", desc: "Healed someone they were told not to. The person who told them remembers." },
+    { r: [13, 14], name: "The Misdiagnosis", desc: "Got something wrong once. The patient recovered. The error remains in the record." },
+    { r: [15, 16], name: "The Last Rite", desc: "Performed a death rite for someone who wasn't quite dead. They came back changed." },
+    { r: [17, 18], name: "The Order's Eye", desc: "The Healing Order is watching their methods. Not yet disapproving. Watching." },
+    { r: [19, 20], name: "The Hollow's Ward", desc: "The Hollow protected them once when they should have died. It expects something in return." }
+  ],
+  Merchant: [
+    { r: [1, 2], name: "The Unpaid Debt", desc: "Owes a significant sum. Creditor has not yet called it in." },
+    { r: [3, 4], name: "The Forged Ledger", desc: "One major transaction was fraudulent. The record exists." },
+    { r: [5, 6], name: "The Ruined Partner", desc: "A previous partner lost everything in a deal they made together." },
+    { r: [7, 8], name: "The Cursed Stock", desc: "Sold something cursed without knowing. Buyer suffered. Buyer remembers." },
+    { r: [9, 10], name: "The Guild Suspension", desc: "Was removed from a guild temporarily. Reason: classified." },
+    { r: [11, 12], name: "The Leverage", desc: "Someone has information about them. Has not used it. Yet." },
+    { r: [13, 14], name: "The Hollow Trade", desc: "Completed a transaction in a Hollow location. The Hollow considers it binding." },
+    { r: [15, 16], name: "The Undercut", desc: "Deliberately destroyed a competitor. The competitor has rebuilt. With allies." },
+    { r: [17, 18], name: "The Stolen Route", desc: "Uses a trade route that belongs to someone else. They have noticed the profit drop." },
+    { r: [19, 20], name: "The Price of Everything", desc: "Knows the value of everything. Once/arc this knowledge is used against them." }
+  ],
+  Bard: [
+    { r: [1, 2], name: "The Stolen Song", desc: "Their most famous work belongs to someone else. That person is still alive." },
+    { r: [3, 4], name: "The Told Secret", desc: "Used someone's confidence in a performance. They heard it." },
+    { r: [5, 6], name: "The Exaggerated Legend", desc: "A story they tell about themselves is not entirely true. Someone knows the real version." },
+    { r: [7, 8], name: "The Inspired Enemy", desc: "A performance once moved the wrong person. They took it personally." },
+    { r: [9, 10], name: "The Hollow Audience", desc: "Performed in a Hollow location. Something in the audience has not forgotten." },
+    { r: [11, 12], name: "The Unfinished Saga", desc: "Began a story they never finished. The subjects are waiting." },
+    { r: [13, 14], name: "The Witness", desc: "Saw something they were not supposed to see. Turned it into art. Art can be found." },
+    { r: [15, 16], name: "The Price of Fame", desc: "Known widely enough that anonymity is impossible in populated areas." },
+    { r: [17, 18], name: "The Last Performance", desc: "Once performed for someone who died immediately after. Some say the performance caused it." },
+    { r: [19, 20], name: "The Hollow's Memory", desc: "The Hollow has recorded one of their performances. They do not know what it will do with it." }
+  ]
+};
+
+const ENCHANTMENTS = {
+  Warrior: [
+    { r: [1, 3], name: "Iron Oath", desc: "Declare a target. +1 ATK against that target until they are defeated." },
+    { r: [4, 6], name: "Blood Memory", desc: "After taking damage, +1 ATK for rest of that session." },
+    { r: [7, 9], name: "The Unbreaking", desc: "Weapon cannot be destroyed, damaged, or disarmed. Ever." },
+    { r: [10, 12], name: "Hollow Temper", desc: "In Hollow locations, weapon deals +1 damage." },
+    { r: [13, 15], name: "The Last Word", desc: "Once/arc, weapon guarantees final strike against a marked enemy." },
+    { r: [16, 18], name: "War's Echo", desc: "First attack each session is always at maximum effect." },
+    { r: [19, 19], name: "The Hollow's Hunger", desc: "Each session, weapon grows stronger. +1 cumulative (resets per arc)." },
+    { r: [20, 20], name: "THE VOID BLESSING", desc: "UNIQUE. Weapon exists partially in the Hollow. Strikes bypass all resistances." }
+  ],
+  Wizard: [
+    { r: [1, 3], name: "Arcane Loop", desc: "Once/session, a failed spell can be re-cast without cost." },
+    { r: [4, 6], name: "Hollow Resonance", desc: "Spells in Hollow locations have +1 effect." },
+    { r: [7, 9], name: "The Unbinding", desc: "Once/arc, break any magical effect or ward. No roll required." },
+    { r: [10, 12], name: "Echo Casting", desc: "Spells leave a faint echo. Can trigger again on 15+ next round." },
+    { r: [13, 15], name: "Void Channel", desc: "Once/session, channel the Hollow directly. Effect determined by DM." },
+    { r: [16, 18], name: "Memory Archive", desc: "Store any piece of knowledge permanently. Perfect recall." },
+    { r: [19, 19], name: "The Hollow's Library", desc: "Once/arc, access any piece of knowledge the Hollow has." },
+    { r: [20, 20], name: "THE VOID MIND", desc: "UNIQUE. Spells cannot fail completely. Minimum result is always Weak Hit." }
+  ],
+  Rogue: [
+    { r: [1, 3], name: "Shadow Step", desc: "Once/session, avoid one consequence entirely. No roll." },
+    { r: [4, 6], name: "The Clean Exit", desc: "Once/session, leave any situation without being followed." },
+    { r: [7, 9], name: "Hollow Fade", desc: "In Hollow locations, become briefly undetectable once/session." },
+    { r: [10, 12], name: "The Long Memory", desc: "Never forget a face, location, or overheard conversation." },
+    { r: [13, 15], name: "Ghost Touch", desc: "Handling items leaves no physical trace." },
+    { r: [16, 18], name: "The Null", desc: "Once/arc, an action you took cannot be proven to have happened." },
+    { r: [19, 19], name: "The Hollow's Cloak", desc: "The Hollow itself obscures their identity. Impossible to scry." },
+    { r: [20, 20], name: "THE VOID STEP", desc: "UNIQUE. Once/arc, be in two locations simultaneously for one scene." }
+  ],
+  Healer: [
+    { r: [1, 3], name: "The Mending", desc: "Healing rolls always restore at least 1 HP, even on failure." },
+    { r: [4, 6], name: "Hollow Touch", desc: "Healing in Hollow locations restores an additional 1 HP." },
+    { r: [7, 9], name: "The Ward", desc: "Once/session, prevent all damage to one character for one round." },
+    { r: [10, 12], name: "Soul Read", desc: "By touch, know exact HP and all active conditions of any character." },
+    { r: [13, 15], name: "The Stitch", desc: "Repair item conditions by one tier once/session." },
+    { r: [16, 18], name: "Life Debt", desc: "Characters they revive carry +1 to all rolls for the following session." },
+    { r: [19, 19], name: "The Hollow's Grace", desc: "Once/arc, heal is maximised without a roll." },
+    { r: [20, 20], name: "THE VOID MEND", desc: "UNIQUE. Once/arc, undo one physical event from this session." }
+  ],
+  Merchant: [
+    { r: [1, 3], name: "Gilded Tongue", desc: "First trade each session automatically goes in their favour." },
+    { r: [4, 6], name: "Hollow Market", desc: "In Hollow locations, find one item unavailable anywhere else." },
+    { r: [7, 9], name: "The Living Ledger", desc: "Automatically know if any deal is unfair to them." },
+    { r: [10, 12], name: "Demand Creation", desc: "Once/session, make an NPC want something they did not want before." },
+    { r: [13, 15], name: "The Network", desc: "Once/arc, a contact delivers something useful. No cost." },
+    { r: [16, 18], name: "Compound Interest", desc: "Each session without making a deal, next deal has +1 bonus (max +3)." },
+    { r: [19, 19], name: "The Hollow's Economy", desc: "Once/arc, exchange anything for anything at agreed value." },
+    { r: [20, 20], name: "THE VOID MARKET", desc: "UNIQUE. Once/arc, create an item that does not exist from nothing." }
+  ],
+  Bard: [
+    { r: [1, 3], name: "The Encore", desc: "Once/session, repeat the effect of any successful performance." },
+    { r: [4, 6], name: "Hollow Song", desc: "In Hollow locations, performances have an additional unpredictable effect." },
+    { r: [7, 9], name: "The Living Record", desc: "Any story they tell becomes true memory for NPCs who hear it." },
+    { r: [10, 12], name: "Crowd Pull", desc: "Once/session, draw any NPC's attention completely for one round." },
+    { r: [13, 15], name: "The Long Note", desc: "A performance effect can persist until next session. Once/arc." },
+    { r: [16, 18], name: "The Stirring", desc: "Once/session, change the emotional state of an entire crowd." },
+    { r: [19, 19], name: "The Hollow's Resonance", desc: "Once/arc, performance affects even Hollow entities." },
+    { r: [20, 20], name: "THE VOID CHORUS", desc: "UNIQUE. Once/arc, perform something that changes one permanent world truth." }
+  ]
+};
+
+const DESTINY_THREADS = {
+  Warrior: [
+    { r: [1, 3], thread: "You will face something that cannot be killed by force alone. What you do in that moment defines what the Hollow thinks of you." },
+    { r: [4, 6], thread: "Someone you protect will betray you. You will see it coming and choose to let it happen anyway." },
+    { r: [7, 9], thread: "The war you fought is not over. The side you fought for is not the side you thought it was." },
+    { r: [10, 12], thread: "You will be given a choice between your weapon and something you value more. The Hollow is watching which you choose." },
+    { r: [13, 15], thread: "A battle is coming that you cannot win. You will fight it anyway. What you lose in it is not what you expect." },
+    { r: [16, 18], thread: "You will become the thing others make stories about. The story will not be the one you would have chosen." },
+    { r: [19, 19], thread: "The Hollow made you a warrior for a specific purpose. You have not yet understood what that purpose is." },
+    { r: [20, 20], thread: "UNIQUE. You are the last of something. When you understand what, everything changes." }
+  ],
+  Wizard: [
+    { r: [1, 3], thread: "The knowledge you are seeking will change what you are. You are seeking it anyway." },
+    { r: [4, 6], thread: "You will find something in the Hollow that no one was meant to find. The finding is the point." },
+    { r: [7, 9], thread: "The answer you need is in a place you cannot go without becoming something you do not want to become." },
+    { r: [10, 12], thread: "Something you know will save a life and end another. You will not know which is which until it is done." },
+    { r: [13, 15], thread: "The Hollow has a question for you. You will not recognise it as a question when it is asked." },
+    { r: [16, 18], thread: "You will be offered everything you have ever wanted. The offering is the test. What you do with the test is the point." },
+    { r: [19, 19], thread: "You are not researching the Hollow. The Hollow is researching you." },
+    { r: [20, 20], thread: "UNIQUE. You already know how this ends. You have not admitted it to yourself yet." }
+  ],
+  Rogue: [
+    { r: [1, 3], thread: "The person you are running from is not who you think they are. Neither are you." },
+    { r: [4, 6], thread: "You will steal something that cannot be unfound. The finder will use it. The use will matter." },
+    { r: [7, 9], thread: "Someone is using you without your knowledge. When you find out, you will have to decide if it matters." },
+    { r: [10, 12], thread: "The one job you refuse to take will find you anyway." },
+    { r: [13, 15], thread: "You will be in the right place at the wrong time or the wrong place at the right time. The Hollow has not decided which." },
+    { r: [16, 18], thread: "Your real name will surface. What people do with it determines what you do next." },
+    { r: [19, 19], thread: "You have already changed something permanently. You do not know what it was." },
+    { r: [20, 20], thread: "UNIQUE. The Hollow has been following your work. It has an offer. The offer is not what you would expect." }
+  ],
+  Healer: [
+    { r: [1, 3], thread: "You will save someone who should not have survived. What they do with that survival is on you." },
+    { r: [4, 6], thread: "The one you could not save will become relevant again. How is not something you can prepare for." },
+    { r: [7, 9], thread: "You will be asked to choose between two lives. The Hollow will not tell you which choice is correct." },
+    { r: [10, 12], thread: "Your healing will be used for something you would not have chosen. You will find out after." },
+    { r: [13, 15], thread: "Something is using your compassion against you. You will have to decide if you care." },
+    { r: [16, 18], thread: "You will face a death you cannot prevent. What you do in the aftermath is the destiny, not the death." },
+    { r: [19, 19], thread: "The Hollow wants something healed that it will not name. You will know it when you see it." },
+    { r: [20, 20], thread: "UNIQUE. You are not here by accident. The Hollow placed you here specifically for one moment that has not happened yet." }
+  ],
+  Merchant: [
+    { r: [1, 3], thread: "The deal that defines you is coming. You will not recognise it as the defining one until it is done." },
+    { r: [4, 6], thread: "You will possess something priceless. The price will be extracted whether you sell it or not." },
+    { r: [7, 9], thread: "The network you have built will be used against you by someone inside it." },
+    { r: [10, 12], thread: "You will be offered a transaction that is genuinely fair. It will be the most dangerous thing anyone has ever offered you." },
+    { r: [13, 15], thread: "Something in the Hollow economy responds to you specifically. You do not yet know if that is good." },
+    { r: [16, 18], thread: "The currency you are actually trading in is not coin. The Hollow is about to show you what it is." },
+    { r: [19, 19], thread: "You will make a deal with something that does not deal in conventional terms. You will not know until after." },
+    { r: [20, 20], thread: "UNIQUE. The Hollow considers you its merchant. This means something specific that you have not been told." }
+  ],
+  Bard: [
+    { r: [1, 3], thread: "The song that defines the Hollow Realm is not yet written. The Hollow is waiting to see if you are the one who writes it." },
+    { r: [4, 6], thread: "You will tell a story that becomes true. You will not know it was a prophecy when you were telling it." },
+    { r: [7, 9], thread: "Your most important audience has not heard you yet. When they do, something permanent happens." },
+    { r: [10, 12], thread: "The story you are afraid to tell is the one that matters most." },
+    { r: [13, 15], thread: "You will witness the defining moment of this arc. What you do with the witness is what the Hollow is interested in." },
+    { r: [16, 18], thread: "Something in the Hollow remembers an older version of a song you know. It wants to hear it again." },
+    { r: [19, 19], thread: "The Hollow is listening to everything you perform. It is building something with what it hears." },
+    { r: [20, 20], thread: "UNIQUE. You are the narrator of this story. You have not realised this means you can change how it ends." }
+  ]
+};
+
 const PRIMARY_STAT = {Warrior:“STR”,Wizard:“INT”,Rogue:“SPD”,Healer:“WIS”,Merchant:“CHA”,Bard:“CHA”};
 const STAT_COLORS = {STR:”#ef5350”,DEF:”#ffd54f”,INT:”#7c4dff”,WIS:”#66bb6a”,SPD:”#4fc3f7”,CHA:”#ff9800”,LCK:”#ce93d8”};
 const RARITY_COLOR = {Common:”#aaa”,Uncommon:”#66bb6a”,Rare:”#4fc3f7”,Legendary:”#ffd54f”,Mythic:”#ce93d8”,Cursed:”#ef5350”};
