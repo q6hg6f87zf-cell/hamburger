@@ -70,7 +70,9 @@ fi
 
 echo "Pushing branch '$BRANCH' to '${REPO_URL}'..."
 if [[ -n "$TOKEN" ]]; then
-  git push -u "$PUSH_URL" "$BRANCH"
+  git push "$PUSH_URL" "$BRANCH"
+  git fetch origin "$BRANCH" >/dev/null 2>&1 || true
+  git branch --set-upstream-to="origin/$BRANCH" "$BRANCH" >/dev/null 2>&1 || true
 else
   git push -u origin "$BRANCH"
 fi
