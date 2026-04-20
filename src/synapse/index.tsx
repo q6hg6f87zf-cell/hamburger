@@ -1,4 +1,3 @@
-```react
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle, CheckCircle2, ChevronDown, Lock, 
@@ -794,4 +793,3 @@ export default function App() {
 }
 
 
-```
