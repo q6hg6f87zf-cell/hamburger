@@ -1,7 +1,0 @@
-# SYNAPSE Source Location
-
-The main React implementation has been moved to:
-
-- `src/Synapse.tsx`
-
-This root file is intentionally kept as a lightweight pointer so the repository root stays clean.
