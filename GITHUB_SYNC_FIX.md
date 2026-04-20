@@ -20,6 +20,7 @@ git push -u origin work
 
 ```bash
 scripts/publish_to_github.sh <YOUR_GITHUB_REPO_URL> work
+# You can also paste a GitHub blob/tree URL; the script normalizes it.
 ```
 
 ## If you want a brand-new GitHub repository

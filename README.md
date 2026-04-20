@@ -23,6 +23,7 @@ If commits are not showing up on GitHub, check whether a remote is configured an
 ```bash
 git remote -v
 scripts/publish_to_github.sh <YOUR_GITHUB_REPO_URL> work
+# Blob/tree URLs are accepted and auto-converted to repo URL.
 ```
 
 See `GITHUB_SYNC_FIX.md` for full recovery steps.
